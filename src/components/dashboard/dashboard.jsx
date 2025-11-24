@@ -20,7 +20,7 @@ import { RenderIcon, getRarityColor, getRarityGradient, IconMap } from './dashbo
 import InventoryView from './inventoryprototype'; 
 import StatisticsTab from './statisticstab'; 
 import ShopFullPage from './shopfullpage'; 
-import EstatePrototype from './estateprototype'; // Import Estate
+import EstatePrototype from './estateprototype'; 
 
 export default function VaultDashboard() {
   // --- STATE INITIALIZATION ---
@@ -72,7 +72,7 @@ export default function VaultDashboard() {
   const [questFilter, setQuestFilter] = useState('active'); 
   const [rewardModal, setRewardModal] = useState(null); 
   const [skillModal, setSkillModal] = useState(null); 
-  const [masteryLogOpen, setMasteryLogOpen] = useState(false); // Master state for Mastery Log Modal
+  const [masteryLogOpen, setMasteryLogOpen] = useState(false); 
   const [editMode, setEditMode] = useState(false);
   const [toast, setToast] = useState(null);
   const [packOpening, setPackOpening] = useState(null);
@@ -110,6 +110,63 @@ export default function VaultDashboard() {
       const newVal = typeof valOrFn === 'function' ? valOrFn(prev.discipline) : valOrFn;
       return { ...prev, discipline: newVal };
     });
+  };
+
+  // FIX: Correctly update widget config without destroying the rest of 'data'
+  const toggleWidget = (key) => {
+    setData(prev => ({ 
+        ...prev,
+        widgetConfig: { 
+            ...prev.widgetConfig,
+            [key]: !prev.widgetConfig?.[key] 
+        }
+    }));
+  };
+
+  // FIX: Add Missing Drag & Drop Handlers to prevent crashes
+  const handleDragStart = (e, widgetId, column, tab) => {
+    e.dataTransfer.setData("widgetId", widgetId);
+    e.dataTransfer.setData("sourceColumn", column);
+    e.dataTransfer.setData("sourceTab", tab);
+    // Store local state for visual feedback if needed
+    setDragItem({ widgetId, column, tab });
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e, targetColumn, targetIndex, targetTab) => {
+    e.preventDefault();
+    const widgetId = e.dataTransfer.getData("widgetId");
+    const sourceColumn = e.dataTransfer.getData("sourceColumn");
+    const sourceTab = e.dataTransfer.getData("sourceTab");
+
+    // Basic validation
+    if (!widgetId || !data.layout[targetTab]) return;
+
+    setData(prev => {
+        const newLayout = JSON.parse(JSON.stringify(prev.layout)); // Deep copy to avoid mutation
+        
+        // 1. Remove from Source
+        const sourceList = newLayout[sourceTab][sourceColumn];
+        const filteredSource = sourceList.filter(id => id !== widgetId);
+        newLayout[sourceTab][sourceColumn] = filteredSource;
+
+        // 2. Add to Target
+        // Note: logic handles moving between columns or within same column
+        const targetList = newLayout[targetTab][targetColumn];
+        
+        // If same list, we need to handle index carefully because 'filteredSource' already removed it
+        if (sourceTab === targetTab && sourceColumn === targetColumn) {
+            targetList.splice(targetIndex, 0, widgetId);
+        } else {
+            targetList.splice(targetIndex, 0, widgetId);
+        }
+
+        return { ...prev, layout: newLayout };
+    });
+    setDragItem(null);
   };
 
   const addToSlotArray = (slots, item, quantity = 1) => {
@@ -348,13 +405,13 @@ export default function VaultDashboard() {
   // --- UI RENDERERS ---
   
   const updateAsset = (key, value) => setData(prev => ({ ...prev, assets: { ...prev.assets, [key]: parseInt(value) || 0 } }));
-  const toggleWidget = (key) => setData(prev => ({ ...prev.widgetConfig, [key]: !prev.widgetConfig?.[key] }));
+  const toggleWidgetConfig = (key) => toggleWidget(key);
   
   const renderWidget = (widgetId) => {
     const isVisible = data.widgetConfig?.[widgetId];
     if (!isVisible && !editMode) return null;
     const commonWrapperClass = `rounded-xl border shadow-lg relative mb-6 transition-all ${editMode ? 'cursor-move border-dashed border-slate-500 hover:bg-slate-800/50' : 'bg-[#1e1e1e] border-[#404e6d]'} ${!isVisible && editMode ? 'opacity-50' : ''}`;
-    const toggleBtn = editMode && <button onClick={() => toggleWidget(widgetId)} className="absolute top-2 right-2 p-1 bg-black/50 rounded z-20 text-white hover:bg-black">{isVisible ? <RenderIcon name="Eye" size={14}/> : <RenderIcon name="EyeOff" size={14}/>}</button>;
+    const toggleBtn = editMode && <button onClick={() => toggleWidgetConfig(widgetId)} className="absolute top-2 right-2 p-1 bg-black/50 rounded z-20 text-white hover:bg-black">{isVisible ? <RenderIcon name="Eye" size={14}/> : <RenderIcon name="EyeOff" size={14}/>}</button>;
     const dragHandle = editMode && <div className="absolute top-2 left-2 text-slate-500"><RenderIcon name="GripVertical" size={16}/></div>;
 
     switch(widgetId) {
@@ -438,6 +495,17 @@ export default function VaultDashboard() {
                 ))}</div><SkillMatrix skills={playerSkills} onItemClick={setSkillModal} />{homeWidgetTab === 'inventory' && <InventoryGrid inventory={data.inventory} mp={data.discipline} onUseItem={handleUseItem} />}</div>);
       case 'active_contracts': return (<div className={`${commonWrapperClass} p-0 h-fit`}>{toggleBtn}{dragHandle}<div className="p-4"><h3 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2"><RenderIcon name="Flame" size={14}/> Active Contracts</h3><ContractWidget contracts={displayContracts} onToggle={toggleAchievement} title="" /></div></div>);
       case 'collection': return (<div className={`${commonWrapperClass} p-6 h-fit`}>{toggleBtn}{dragHandle}<CollectionBinder cards={data.cards} onSell={handleSellCard} /></div>);
+      
+      // FIX: Added handler for the mastery_log_btn to render a button if added to the grid
+      case 'mastery_log_btn': 
+        return (
+            <div className={`${commonWrapperClass} p-4 h-fit flex items-center justify-center`}>
+                {toggleBtn}{dragHandle}
+                <button onClick={() => setMasteryLogOpen(true)} className="bg-amber-500 hover:bg-amber-400 text-black font-bold py-2 px-4 rounded flex items-center gap-2">
+                    <RenderIcon name="Scroll" size={20}/> Open Mastery Log
+                </button>
+            </div>
+        );
 
       default: return null;
     }
@@ -483,7 +551,7 @@ export default function VaultDashboard() {
               { id: 'shop', icon: "ShoppingBag", label: 'SHOP' }, 
               { id: 'inventory', icon: "Package", label: 'INVENTORY' },
               { id: 'stats', icon: "Activity", label: 'STATS' }, 
-              { id: 'estate', icon: "Home", label: 'ESTATE' }, // Fixed: Added Estate Tab
+              { id: 'estate', icon: "Home", label: 'ESTATE' }, 
               { id: 'inputs', icon: "Code", label: 'INPUTS' } 
             ].map((tab) => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-2" style={{ backgroundColor: activeTab === tab.id ? colors.accentPrimary : 'transparent', color: activeTab === tab.id ? '#000' : '#94a3b8' }}>
@@ -504,7 +572,7 @@ export default function VaultDashboard() {
                        <div className="bg-[#1e1e1e] border border-slate-700 rounded-lg p-2 flex gap-2 mr-4 items-center shadow-xl animate-in fade-in zoom-in">
                           <div className="text-xs font-bold text-slate-400 px-2 uppercase tracking-wider border-r border-slate-700 mr-1">Interface Config</div>
                           {['daily_ops', 'contract', 'skills', 'shop'].map(k => (
-                             <button key={k} onClick={() => toggleWidget(k)} className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${data.widgetConfig[k] ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>{k.replace('_',' ')}</button>
+                             <button key={k} onClick={() => toggleWidgetConfig(k)} className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${data.widgetConfig[k] ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>{k.replace('_',' ')}</button>
                           ))}
                        </div>
                     )}
@@ -576,8 +644,8 @@ export default function VaultDashboard() {
                 {editMode && (
                    <div className="bg-[#1e1e1e] border border-slate-700 rounded-lg p-2 flex gap-2 mr-4 items-center shadow-xl animate-in fade-in zoom-in">
                       <div className="text-xs font-bold text-slate-400 px-2 uppercase tracking-wider border-r border-slate-700 mr-1">Profile Config</div>
-                      {['player_card', 'p_vitals', 'financial_overview', 'unified_menu', 'active_contracts', 'collection', 'mastery_log_btn'].map(k => ( // Added mastery_log_btn to config menu
-                         <button key={k} onClick={() => toggleWidget(k)} className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${data.widgetConfig[k] ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+                      {['player_card', 'p_vitals', 'financial_overview', 'unified_menu', 'active_contracts', 'collection', 'mastery_log_btn'].map(k => (
+                         <button key={k} onClick={() => toggleWidgetConfig(k)} className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${data.widgetConfig[k] ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
                            {k === 'mastery_log_btn' ? 'Mastery Log' : k.replace(/_/g,' ')}
                          </button>
                       ))}
