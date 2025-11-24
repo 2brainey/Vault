@@ -14,12 +14,12 @@ import {
   Box, Dna, Hexagon, Server, Globe, Wifi, Database, Key,
   MousePointer, GripVertical, Settings, Sliders, Crown, Gift,
   Building, Landmark, Gavel, Filter, Watch, Mic, Library, Archive,
-  Trash2
+  Trash2, Bed, Bath, Utensils, Expand
 } from 'lucide-react';
 
 // --- CONFIGURATION ---
 export const USER_NAME = "Justin";
-export const CURRENT_VERSION = "v27.1";
+export const CURRENT_VERSION = "v28.0"; // Updated for Statistics
 export const INVENTORY_SLOTS = 28;
 export const BANK_SLOTS = 50;
 export const MAX_SKILL_LEVEL = 99;
@@ -27,8 +27,10 @@ export const TOTAL_SKILLS = 13;
 export const MAX_TOTAL_LEVEL = MAX_SKILL_LEVEL * TOTAL_SKILLS;
 export const CONTRACTS_PER_PAGE = 5;
 export const CARDS_PER_PAGE = 8;
+export const PLOT_COST = 1000;
+export const MAX_GRID_DIMENSION = 10;
 
-// --- DATA CONSTANTS ---
+// --- STATIC DATA ---
 
 export const SKILL_DETAILS = {
   inc: { name: "Income", icon: "Sword", desc: "Raw earning power.", unlocks: [{ level: 10, title: "Paycheck" }, { level: 50, title: "$100k Club" }, { level: 99, title: "Tycoon" }] },
@@ -100,6 +102,28 @@ export const SHOP_ITEMS = {
   ]
 };
 
+export const ESTATE_ROOMS = [
+    // SPECIAL / EXPANSION
+    { id: 'expansion', name: 'Land Expansion', cost: 25000, icon: 'Expand', desc: 'Expand estate borders (+1 Row/Col)', type: 'Special', isExpansion: true },
+    { id: 'plot_deed', name: 'Plot Deed', cost: PLOT_COST, icon: 'Map', desc: 'Claim a single plot of land', type: 'Special', isDeed: true },
+    
+    // BUNDLES
+    { id: 'starter_home', name: 'Starter Home', cost: 15000, icon: 'Home', desc: 'Master Suite (Bed, Bath, Kitchen)', type: 'Bundle', multiplier: 1.2, isBundle: true },
+
+    // BARE NECESSITIES
+    { id: 'bedroom', name: 'Master Bedroom', cost: 5000, icon: 'Bed', desc: '+5% Energy Regen', type: 'Rest', multiplier: 1.05 },
+    { id: 'kitchen', name: 'Chef Kitchen', cost: 6000, icon: 'Utensils', desc: '+5% Nutrition Efficiency', type: 'Sustenance', multiplier: 1.05 },
+    { id: 'bathroom', name: 'Luxury Bath', cost: 4500, icon: 'Bath', desc: '+5% Focus Regen', type: 'Hygiene', multiplier: 1.05 },
+
+    // FACILITIES
+    { id: 'gym', name: 'Home Gym', cost: 8000, icon: 'Dumbbell', desc: '+10% Vitality XP Gain', type: 'Health', multiplier: 1.1 },
+    { id: 'office', name: 'Command Center', cost: 12000, icon: 'Monitor', desc: '+10% Coding XP Gain', type: 'Tech', multiplier: 1.1 },
+    { id: 'library', name: 'Grand Library', cost: 10000, icon: 'Book', desc: '+10% Wisdom XP Gain', type: 'Knowledge', multiplier: 1.1 },
+    { id: 'studio', name: 'Content Studio', cost: 9000, icon: 'Camera', desc: '+10% Content XP Gain', type: 'Creative', multiplier: 1.1 },
+    { id: 'vault', name: 'Hidden Vault', cost: 20000, icon: 'Lock', desc: 'Protects streak from decay', type: 'Security', multiplier: 1.0 },
+    { id: 'garden', name: 'Zen Garden', cost: 6000, icon: 'Sprout', desc: '+5 Energy Regen/Day', type: 'Wellness', multiplier: 1.0 },
+];
+
 // --- INITIAL DATA ---
 export const initialData = {
   setupComplete: true, 
@@ -115,46 +139,74 @@ export const initialData = {
   liabilities: { debt: 2000, mortgage: 0 },
   wellness: { energy: 80, hydration: 60, focus: 45 },
   
-  // UPDATE: Inventory is now 28 null slots, Bank is 50 null slots
+  // NEW: Centralized Statistics Tracking
+  statistics: {
+    sessionsOpened: 0,
+    contractsCompleted: 0,
+    cardsSold: 0,
+    packsOpened: 0,
+    itemsBought: 0,
+    totalDisciplineEarned: 0,
+    maintenance: {
+        energy: 0,
+        hydration: 0,
+        focus: 0
+    }
+  },
+
+  // 28 Slot Inventory
   inventory: [
     { id: 1, name: "Windows 10 PC", type: "Tech", desc: "Command Station", iconName: "Monitor", rarity: "Rare", count: 1 },
     { id: 2, name: "Vault Code", type: "Security", desc: "Access Keys", iconName: "FileKey", rarity: "Legendary", count: 1 },
-    ...new Array(26).fill(null) // Pad remainder with null
+    ...new Array(26).fill(null) 
   ],
-  bank: new Array(BANK_SLOTS).fill(null), // New Bank State
+  
+  // 50 Slot Bank
+  bank: new Array(50).fill(null), 
   bankBalance: 0,
 
   cards: [], 
+  
   achievements: [
-      // EASY
-      { id: 'q1', title: "Hydrated", desc: "Drink a glass of water.", xp: 100, category: "Vitality", completed: false, difficulty: "Easy" },
-      { id: 'q2', title: "Hello World", desc: "Write 1 line of code.", xp: 150, category: "Code", completed: false, difficulty: "Easy" },
-      { id: 'q3', title: "First Step", desc: "Walk 1,000 steps.", xp: 100, category: "Vitality", completed: false, difficulty: "Easy" },
-      { id: 'q4', title: "Lurker", desc: "Join a Discord server.", xp: 150, category: "Network", completed: false, difficulty: "Easy" },
-      { id: 'q5', title: "Penny Saved", desc: "Save $10 this week.", xp: 200, category: "Security", completed: false, difficulty: "Easy" },
-      { id: 'q6', title: "Idea Log", desc: "Write down one business idea.", xp: 150, category: "Wisdom", completed: false, difficulty: "Easy" },
-      { id: 'q7', title: "Read a Page", desc: "Read 1 page of a book.", xp: 100, category: "Wisdom", completed: false, difficulty: "Easy" },
-      { id: 'q8', title: "Clean Desk", desc: "Organize your workspace.", xp: 100, category: "Discipline", completed: false, difficulty: "Easy" },
-      
-      // MEDIUM
-      { id: 'q10', title: "Gym Rat", desc: "Workout 3x in a week.", xp: 1000, category: "Vitality", completed: false, difficulty: "Medium" },
-      { id: 'q11', title: "Freelancer", desc: "Earn your first $100 online.", xp: 1500, category: "Income", completed: false, difficulty: "Medium" },
-      { id: 'q12', title: "Stacker", desc: "Buy 1oz of Silver.", xp: 1200, category: "Assets", completed: false, difficulty: "Medium" },
-      { id: 'q13', title: "Content Creator", desc: "Post 1 video or article.", xp: 1000, category: "Content", completed: false, difficulty: "Medium" },
-      { id: 'q14', title: "Debt Chipper", desc: "Pay off $500 of debt.", xp: 2000, category: "Security", completed: false, difficulty: "Medium" },
-      { id: 'q15', title: "Script Kiddie", desc: "Build a simple calculator app.", xp: 2500, category: "Code", completed: false, difficulty: "Medium" },
-      { id: 'q16', title: "Cold Call", desc: "Reach out to 5 prospects.", xp: 1500, category: "Network", completed: false, difficulty: "Medium" },
-      
-      // HARD
-      { id: 'def_1', title: "Fortress of Solitude", desc: "Save 3 months expenses ($9.6k)", xp: 5000, category: 'Security', completed: false, difficulty: "Hard" },
-      { id: 'def_3', title: "Debt Slayer", desc: "Eliminate all consumer debt", xp: 8000, category: 'Security', completed: false, difficulty: "Hard" },
-      { id: 'sk_2', title: "The First Dollar", desc: "Earn $1,000 online total", xp: 5000, category: 'Income', completed: false, difficulty: "Hard" },
-      { id: 'q17', title: "Landlord", desc: "Acquire your first rental property.", xp: 15000, category: "Estate", completed: false, difficulty: "Hard" },
-      { id: 'q18', title: "Gold Bug", desc: "Acquire 1oz of Gold.", xp: 6000, category: "Assets", completed: false, difficulty: "Hard" },
-      { id: 'q19', title: "1000 True Fans", desc: "Reach 1,000 Followers.", xp: 10000, category: "Content", completed: false, difficulty: "Hard" },
-      { id: 'q20', title: "SaaS Founder", desc: "Launch a paid product.", xp: 20000, category: "Code", completed: false, difficulty: "Hard" },
-      { id: 'q21', title: "1000lb Club", desc: "Squat/Bench/Deadlift 1000lbs total.", xp: 10000, category: "Vitality", completed: false, difficulty: "Hard" },
-      { id: 'q22', title: "Angel Investor", desc: "Invest in a startup.", xp: 12000, category: "Invest", completed: false, difficulty: "Hard" }
+    // EASY
+    { id: 'q1', title: "Hydrated", desc: "Drink a glass of water.", xp: 100, category: "Vitality", completed: false, difficulty: "Easy" },
+    { id: 'q2', title: "Hello World", desc: "Write 1 line of code.", xp: 150, category: "Code", completed: false, difficulty: "Easy" },
+    { id: 'q3', title: "First Step", desc: "Walk 1,000 steps.", xp: 100, category: "Vitality", completed: false, difficulty: "Easy" },
+    { id: 'q4', title: "Lurker", desc: "Join a Discord server.", xp: 150, category: "Network", completed: false, difficulty: "Easy" },
+    { id: 'q5', title: "Penny Saved", desc: "Save $10 this week.", xp: 200, category: "Security", completed: false, difficulty: "Easy" },
+    { id: 'q6', title: "Idea Log", desc: "Write down one business idea.", xp: 150, category: "Wisdom", completed: false, difficulty: "Easy" },
+    { id: 'q7', title: "Read a Page", desc: "Read 1 page of a book.", xp: 100, category: "Wisdom", completed: false, difficulty: "Easy" },
+    { id: 'q8', title: "Clean Desk", desc: "Organize your workspace.", xp: 100, category: "Discipline", completed: false, difficulty: "Easy" },
+    
+    // MEDIUM
+    { 
+      id: 'q10', 
+      title: "Gym Rat", 
+      desc: "Workout 3x in a week.", 
+      xp: 1000, 
+      category: "Vitality", 
+      completed: false, 
+      difficulty: "Medium", 
+      // NEW: Test Reward
+      rewardItem: { id: 'r_energy_pack', name: "Energy Drink", type: "Consumable", desc: "+10 Energy", iconName: "Zap", rarity: "Common", count: 3 }
+    },
+    { id: 'q11', title: "Freelancer", desc: "Earn your first $100 online.", xp: 1500, category: "Income", completed: false, difficulty: "Medium" },
+    { id: 'q12', title: "Stacker", desc: "Buy 1oz of Silver.", xp: 1200, category: "Assets", completed: false, difficulty: "Medium" },
+    { id: 'q13', title: "Content Creator", desc: "Post 1 video or article.", xp: 1000, category: "Content", completed: false, difficulty: "Medium" },
+    { id: 'q14', title: "Debt Chipper", desc: "Pay off $500 of debt.", xp: 2000, category: "Security", completed: false, difficulty: "Medium" },
+    { id: 'q15', title: "Script Kiddie", desc: "Build a simple calculator app.", xp: 2500, category: "Code", completed: false, difficulty: "Medium" },
+    { id: 'q16', title: "Cold Call", desc: "Reach out to 5 prospects.", xp: 1500, category: "Network", completed: false, difficulty: "Medium" },
+    
+    // HARD
+    { id: 'def_1', title: "Fortress of Solitude", desc: "Save 3 months expenses ($9.6k)", xp: 5000, category: 'Security', completed: false, difficulty: "Hard" },
+    { id: 'def_3', title: "Debt Slayer", desc: "Eliminate all consumer debt", xp: 8000, category: 'Security', completed: false, difficulty: "Hard" },
+    { id: 'sk_2', title: "The First Dollar", desc: "Earn $1,000 online total", xp: 5000, category: 'Income', completed: false, difficulty: "Hard" },
+    { id: 'q17', title: "Landlord", desc: "Acquire your first rental property.", xp: 15000, category: "Estate", completed: false, difficulty: "Hard" },
+    { id: 'q18', title: "Gold Bug", desc: "Acquire 1oz of Gold.", xp: 6000, category: "Assets", completed: false, difficulty: "Hard" },
+    { id: 'q19', title: "1000 True Fans", desc: "Reach 1,000 Followers.", xp: 10000, category: "Content", completed: false, difficulty: "Hard" },
+    { id: 'q20', title: "SaaS Founder", desc: "Launch a paid product.", xp: 20000, category: "Code", completed: false, difficulty: "Hard" },
+    { id: 'q21', title: "1000lb Club", desc: "Squat/Bench/Deadlift 1000lbs total.", xp: 10000, category: "Vitality", completed: false, difficulty: "Hard" },
+    { id: 'q22', title: "Angel Investor", desc: "Invest in a startup.", xp: 12000, category: "Invest", completed: false, difficulty: "Hard" }
   ],
   widgetConfig: { 
     welcome: true, contract: true, skills: true, vitals: true, shop: true, grind: true,

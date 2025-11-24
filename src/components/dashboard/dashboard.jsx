@@ -14,55 +14,55 @@ import {
 } from './dashboardui';
 
 // 3. Utils Import
-import { RenderIcon, getRarityColor, IconMap } from './dashboardutils';
+import { RenderIcon, getRarityColor, getRarityGradient, IconMap } from './dashboardutils';
 
-// 4. Inventory View Import
-import InventoryView from './InventoryPrototype';
+// 4. Feature Imports
+import InventoryView from './inventoryprototype'; 
+import StatisticsTab from './statisticstab'; 
+import ShopFullPage from './shopfullpage'; 
+import EstatePrototype from './estateprototype'; // Import Estate
 
 export default function VaultDashboard() {
   // --- STATE INITIALIZATION ---
   const [data, setData] = useState(() => {
     try {
-      const saved = localStorage.getItem('vault_data_v27.1'); 
+      const saved = localStorage.getItem('vault_data_v28.0'); 
       const loaded = saved ? JSON.parse(saved) : initialData;
-      const safe = { ...initialData, ...loaded };
       
-      // Integrity Check: Ensure Inventory Array is correct size
-      if (!Array.isArray(safe.inventory) || safe.inventory.length !== INVENTORY_SLOTS) {
-          const fixedInv = new Array(INVENTORY_SLOTS).fill(null);
-          if(Array.isArray(safe.inventory)) {
-             safe.inventory.forEach((item, i) => { if(i < INVENTORY_SLOTS) fixedInv[i] = item; });
-          }
-          safe.inventory = fixedInv;
-      }
-
-      // Integrity Check: Ensure Bank Array is correct size
-      if (!Array.isArray(safe.bank) || safe.bank.length !== BANK_SLOTS) {
-          const fixedBank = new Array(BANK_SLOTS).fill(null);
-          if(Array.isArray(safe.bank)) {
-             safe.bank.forEach((item, i) => { if(i < BANK_SLOTS) fixedBank[i] = item; });
-          }
-          safe.bank = fixedBank;
-      }
-      
-      // Ensure Bank Balance exists
-      if (safe.bankBalance === undefined) safe.bankBalance = 0;
-
-      // Merge Layouts
-      safe.layout = { 
-        home: { left: [], right: [], ...loaded.layout?.home },
-        profile: { left: [], center: [], right: [], ...loaded.layout?.profile },
-        vault: { left: [], center: [], right: [], ...loaded.layout?.vault }
+      const safe = { 
+          ...initialData, 
+          ...loaded,
+          statistics: { ...initialData.statistics, ...(loaded.statistics || {}) },
+          bonusXP: { ...initialData.bonusXP, ...(loaded.bonusXP || {}) },
+          wellness: { ...initialData.wellness, ...(loaded.wellness || {}) },
+          assets: { ...initialData.assets, ...(loaded.assets || {}) },
+          liabilities: { ...initialData.liabilities, ...(loaded.liabilities || {}) },
+          inventory: Array.isArray(loaded.inventory) ? loaded.inventory : initialData.inventory,
+          bank: Array.isArray(loaded.bank) ? loaded.bank : initialData.bank,
+          achievements: Array.isArray(loaded.achievements) ? loaded.achievements : initialData.achievements
       };
-      safe.widgetConfig = { ...initialData.widgetConfig, ...loaded.widgetConfig };
-      
+
+      if (safe.inventory.length !== INVENTORY_SLOTS) {
+         const fixed = new Array(INVENTORY_SLOTS).fill(null);
+         safe.inventory.forEach((item, i) => { if(i<INVENTORY_SLOTS) fixed[i] = item });
+         safe.inventory = fixed;
+      }
+
       return safe;
     } catch (e) {
-      console.error("Save Data Corrupt, resetting:", e);
       return initialData;
     }
   });
   
+  // Increment Session Count on Mount
+  useEffect(() => {
+      setData(prev => ({
+          ...prev,
+          statistics: { ...prev.statistics, sessionsOpened: (prev.statistics?.sessionsOpened || 0) + 1 }
+      }));
+  }, []);
+
+  // UI State
   const [activeTab, setActiveTab] = useState('dynamic'); 
   const [homeWidgetTab, setHomeWidgetTab] = useState('skills'); 
   const [profileWidgetTab, setProfileWidgetTab] = useState('skills'); 
@@ -72,21 +72,16 @@ export default function VaultDashboard() {
   const [questFilter, setQuestFilter] = useState('active'); 
   const [rewardModal, setRewardModal] = useState(null); 
   const [skillModal, setSkillModal] = useState(null); 
-  const [masteryLogOpen, setMasteryLogOpen] = useState(false); 
+  const [masteryLogOpen, setMasteryLogOpen] = useState(false); // Master state for Mastery Log Modal
   const [editMode, setEditMode] = useState(false);
   const [toast, setToast] = useState(null);
   const [packOpening, setPackOpening] = useState(null);
   const [dragItem, setDragItem] = useState(null);
 
-  const colors = {
-    bg: "#2b3446",
-    border: "#404e6d",
-    accentSecondary: "#78643e",
-    accentPrimary: "#e1b542"
-  };
+  const colors = { bg: "#2b3446", border: "#404e6d", accentSecondary: "#78643e", accentPrimary: "#e1b542" };
 
   useEffect(() => {
-    localStorage.setItem('vault_data_v27.1', JSON.stringify(data));
+    localStorage.setItem('vault_data_v28.0', JSON.stringify(data));
   }, [data]);
 
   // --- VITAL DECAY LOOP ---
@@ -104,38 +99,37 @@ export default function VaultDashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  // --- LOGIC HELPERS ---
+  // --- HELPERS ---
   const showToast = useCallback((msg, type = 'info') => { 
       setToast({ msg, type }); 
       setTimeout(() => setToast(null), 3000); 
   }, []);
 
-  // Unified Add Item Logic (Handles Stacking & Slot Finding)
+  const handleSetDiscipline = (valOrFn) => {
+    setData(prev => {
+      const newVal = typeof valOrFn === 'function' ? valOrFn(prev.discipline) : valOrFn;
+      return { ...prev, discipline: newVal };
+    });
+  };
+
   const addToSlotArray = (slots, item, quantity = 1) => {
       const newSlots = [...slots];
-      
-      // 1. Check for existing stack
       const existingIndex = newSlots.findIndex(s => s && s.name === item.name && s.rarity === item.rarity);
       if (existingIndex !== -1) {
           newSlots[existingIndex] = { ...newSlots[existingIndex], count: newSlots[existingIndex].count + quantity };
           return newSlots;
       }
-      
-      // 2. Find empty slot
       const emptyIndex = newSlots.findIndex(s => s === null);
       if (emptyIndex !== -1) {
-          newSlots[emptyIndex] = { ...item, count: quantity, id: Date.now() + Math.random() }; // Unique ID for dragging
+          newSlots[emptyIndex] = { ...item, count: quantity, id: Date.now() + Math.random() };
           return newSlots;
       }
-      
-      return null; // Full
+      return null;
   };
 
-  // Pack Generation Logic
   const generatePackCards = (packType) => {
       let weights = { c: 60, u: 30, r: 8, e: 1.9, l: 0.1 };
       let cardCount = 3;
-      
       if (packType === 'Epic') { weights = { c: 20, u: 40, r: 30, e: 9, l: 1 }; cardCount = 5; } 
       else if (packType === 'Legendary') { weights = { c: 0, u: 10, r: 40, e: 40, l: 10 }; cardCount = 5; }
       
@@ -143,7 +137,6 @@ export default function VaultDashboard() {
       for(let i=0; i<cardCount; i++) {
         const rand = Math.random() * 100;
         let cardRarity = 'Common';
-        
         if (rand > (100 - weights.l)) cardRarity = 'Legendary';
         else if (rand > (100 - weights.l - weights.e)) cardRarity = 'Epic';
         else if (rand > (100 - weights.l - weights.e - weights.r)) cardRarity = 'Rare';
@@ -156,78 +149,26 @@ export default function VaultDashboard() {
       return newCards;
   };
 
-  // --- INTERACTION HANDLERS ---
+  // --- ACTIONS WITH STAT TRACKING ---
 
-  const handleUseItem = (item, index, containerId) => {
-      if(containerId !== 'inventory') {
-          showToast("Move item to Backpack to use it.", "error");
-          return;
-      }
+  const updateWellness = (type, amount) => {
+    const now = new Date().toDateString();
+    setData(prev => {
+        const newStats = { ...prev.statistics };
+        if (amount > 0) {
+            if (!newStats.maintenance) newStats.maintenance = { energy: 0, hydration: 0, focus: 0 };
+            newStats.maintenance[type] = (newStats.maintenance[type] || 0) + 1;
+        }
 
-      if (item.type === 'Box' || item.type === 'Pack') {
-          const newSlots = [...data.inventory];
-          if (newSlots[index].count > 1) newSlots[index].count--; 
-          else newSlots[index] = null;
-          
-          if (item.type === 'Box') {
-              // Add 5 Packs
-              const pack = { name: "Standard Pack", type: "Pack", desc: "3 Cards", iconName: "Package", rarity: "Uncommon" };
-              let updatedSlots = newSlots;
-              let successCount = 0;
-              
-              for(let i=0; i<5; i++) {
-                  const nextSlots = addToSlotArray(updatedSlots, pack, 1);
-                  if(nextSlots) {
-                      updatedSlots = nextSlots;
-                      successCount++;
-                  } else {
-                      showToast("Inventory Full! Some items lost.", "error");
-                      break;
-                  }
-              }
-              
-              setData(prev => ({ ...prev, inventory: updatedSlots }));
-              if(successCount > 0) showToast(`Box Opened! ${successCount} Packs added.`, "success");
-
-      } else if (item.type === 'Pack') {
-          // Open Pack: Remove 1 Pack, Add Cards to Collection
-          const newCards = generatePackCards(item.rarity);
-          
-          setData(prev => ({
-              ...prev,
-              inventory: newSlots,
-              cards: [...prev.cards, ...newCards.map(c => c.id)]
-          }));
-          setPackOpening(newCards); // Trigger Animation
-      } 
-      } else {
-          showToast(`${item.name} examined.`, 'info');
-      }
-  };
-
-  const purchaseItem = (item, category) => {
-    if (data.discipline >= item.cost) {
-      if (category === 'gear' || category === 'packs') {
-          const updatedInv = addToSlotArray(data.inventory, item, 1);
-          if (!updatedInv) { showToast("Inventory Full!", 'error'); return; }
-          
-          setData(prev => ({ 
-              ...prev, 
-              discipline: prev.discipline - item.cost, 
-              inventory: updatedInv 
-          }));
-      } else {
-          // Boosters (Immediate XP)
-          setData(prev => ({
-              ...prev, 
-              discipline: prev.discipline - item.cost,
-              bonusXP: { ...prev.bonusXP, [item.skillId]: (prev.bonusXP?.[item.skillId] || 0) + item.xpAmount }
-          }));
-      }
-      showToast(`Purchased ${item.name}`, 'success');
-    } else {
-      showToast("Not enough DSC", 'error');
-    }
+        return {
+            ...prev,
+            statistics: newStats,
+            wellness: { ...prev.wellness, [type]: Math.min(100, Math.max(0, prev.wellness[type] + amount)) },
+            discipline: prev.discipline + (amount > 0 ? 5 : 0),
+            lastMaintenance: now
+        };
+    });
+    if (amount > 0) showToast(`+5 DSC | Tracked: ${type}`, 'success');
   };
 
   const manualGrind = (skillKey, mpReward, energyCost) => {
@@ -243,13 +184,75 @@ export default function VaultDashboard() {
       showToast("Not enough energy!", 'error');
     }
   };
-  const sellCard = (cardId, value) => {
+
+  const handleUseItem = (item, index, containerId) => {
+      if(containerId !== 'inventory') { showToast("Move to Backpack to use", "error"); return; }
+
+      const incrementPackStat = (prev) => ({ ...prev.statistics, packsOpened: (prev.statistics.packsOpened || 0) + 1 });
+
+      if (item.type === 'Box') {
+          const newSlots = [...data.inventory];
+          if (newSlots[index].count > 1) newSlots[index].count--; else newSlots[index] = null;
+          const pack = { name: "Standard Pack", type: "Pack", desc: "3 Cards", iconName: "Package", rarity: "Uncommon" };
+          let updatedSlots = newSlots;
+          for(let i=0; i<5; i++) {
+              const nextSlots = addToSlotArray(updatedSlots, pack, 1);
+              if(nextSlots) updatedSlots = nextSlots;
+          }
+          setData(prev => ({ ...prev, inventory: updatedSlots }));
+          showToast("Box Opened! 5 Packs added.");
+
+      } else if (item.type === 'Pack') {
+          const newSlots = [...data.inventory];
+          if (newSlots[index].count > 1) newSlots[index].count--; else newSlots[index] = null;
+          const newCards = generatePackCards(item.rarity);
+          setData(prev => ({
+              ...prev,
+              statistics: incrementPackStat(prev),
+              inventory: newSlots,
+              cards: [...prev.cards, ...newCards.map(c => c.id)]
+          }));
+          setPackOpening(newCards);
+      }
+  };
+
+  const purchaseItem = (item, category) => {
+    if (data.discipline >= item.cost) {
+      const incrementBought = (prev) => ({...prev.statistics, itemsBought: (prev.statistics.itemsBought || 0) + 1 });
+
+      if (category === 'gear' || category === 'packs') {
+          const updatedInv = addToSlotArray(data.inventory, item, 1);
+          if (!updatedInv) { showToast("Inventory Full!", 'error'); return; }
+          setData(prev => ({ 
+              ...prev, 
+              statistics: incrementBought(prev),
+              discipline: prev.discipline - item.cost, 
+              inventory: updatedInv 
+          }));
+      } else {
+          setData(prev => ({
+              ...prev, 
+              statistics: incrementBought(prev),
+              discipline: prev.discipline - item.cost,
+              bonusXP: { ...prev.bonusXP, [item.skillId]: (prev.bonusXP?.[item.skillId] || 0) + item.xpAmount }
+          }));
+      }
+      showToast(`Purchased ${item.name}`, 'success');
+    } else { showToast("Not enough DSC", 'error'); }
+  };
+
+  const handleSellCard = (cardId, value) => {
       const index = data.cards.indexOf(cardId);
       if (index > -1) {
           const newCards = [...data.cards];
           newCards.splice(index, 1); 
           setData(prev => ({
               ...prev,
+              statistics: { 
+                  ...prev.statistics, 
+                  cardsSold: (prev.statistics.cardsSold || 0) + 1,
+                  totalDisciplineEarned: (prev.statistics.totalDisciplineEarned || 0) + value 
+              },
               cards: newCards,
               discipline: prev.discipline + value
           }));
@@ -257,97 +260,96 @@ export default function VaultDashboard() {
       }
   };
 
+  const toggleAchievement = (id) => {
+    const achievement = data.achievements.find(a => a.id === id);
+    if(!achievement) return;
+    const isCompleting = !achievement.completed;
+    
+    let newInventory = [...data.inventory];
+    let rewardMsg = "";
+    
+    if (isCompleting && achievement.rewardItem) {
+        const updatedInv = addToSlotArray(newInventory, achievement.rewardItem, achievement.rewardItem.count || 1);
+        if (updatedInv) { newInventory = updatedInv; rewardMsg = ` + ${achievement.rewardItem.name}`; } 
+        else { showToast("Inventory full! Reward discarded.", "error"); }
+    }
+
+    setData(prev => {
+        const newStats = { ...prev.statistics };
+        if (isCompleting) newStats.contractsCompleted = (newStats.contractsCompleted || 0) + 1;
+        return { ...prev, statistics: newStats, inventory: newInventory, achievements: prev.achievements.map(a => a.id === id ? { ...a, completed: !a.completed } : a) };
+    });
+
+    if (isCompleting) { showToast(`Completed: ${achievement.title}${rewardMsg}`, 'success'); }
+  };
+
   // --- MEMOIZED DATA ---
   const financials = useMemo(() => {
       const totalAssets = Object.values(data.assets || {}).reduce((a, b) => Number(a || 0) + Number(b || 0), 0) + Number(data.cash || 0);
       const totalLiabilities = Object.values(data.liabilities || {}).reduce((a, b) => Number(a || 0) + Number(b || 0), 0);
-      return { totalAssets, totalLiabilities, netWorth: totalAssets - totalLiabilities };
-  }, [data.assets, data.cash, data.liabilities]);
+      const netWorth = totalAssets - totalLiabilities;
+      const monthlyCashFlow = (data.monthlyIncome || 0) - (data.monthlyExpenses || 0);
+      const runwayMonths = ((data.cash || 0) / (data.monthlyExpenses || 1)).toFixed(1);
+      return { totalAssets, totalLiabilities, netWorth, monthlyCashFlow, runwayMonths };
+  }, [data.assets, data.cash, data.liabilities, data.monthlyIncome, data.monthlyExpenses]);
 
-  // ... (Keep playerSkills and combatStats) ...
   const playerSkills = useMemo(() => {
     const calcLevel = (xp) => Math.max(1, Math.min(Math.floor(25 * Math.log10((xp / 100) + 1)), 99));
     const getXP = (base, id) => (Number(base) || 0) + (data.bonusXP?.[id] || 0);
     
-    // Skill Base Values Calculation
     const incXP = getXP((data.monthlyIncome || 0) * 12, 'inc');
-    const codXP = getXP(35000 + ((data.assets.digitalIP || 0) * 5), 'cod');
-    const cntXP = getXP(15000 + ((data.assets.audience || 0) * 50), 'cnt');
+    const codXP = getXP(35000 + ((data.assets?.digitalIP || 0) * 5), 'cod');
+    const cntXP = getXP(15000 + ((data.assets?.audience || 0) * 50), 'cnt');
     const secXP = getXP((data.cash || 0) + (((data.cash || 0) / (data.monthlyExpenses || 1)) * 5000), 'sec');
+    const vitXP = getXP(85000, 'vit');
+    const wisXP = getXP(30000 + (data.achievements.filter(a => a.completed).length * 5000), 'wis');
+    const netXP = getXP(15000 + ((data.assets?.audience || 0) * 100), 'net');
+    const astXP = getXP((data.assets?.crypto || 0) + (data.assets?.metals || 0), 'ast');
+    const floXP = getXP(((data.monthlyIncome || 0) - (data.monthlyExpenses || 0)) * 20, 'flo');
+    const invXP = getXP(Math.max((data.assets?.stocks || 0) + (data.assets?.crypto || 0), 0), 'inv');
+    const estXP = getXP((data.assets?.realEstate || 0), 'est');
+    const disXP = getXP(0, 'dis');
     
     return Object.keys(SKILL_DETAILS).map(key => {
         let xp = 0;
         if(key === 'inc') xp = incXP;
         else if(key === 'cod') xp = codXP;
         else if(key === 'cnt') xp = cntXP;
+        else if(key === 'ai') xp = getXP(40000, 'ai');
         else if(key === 'sec') xp = secXP;
-        else xp = getXP(0, key); // Default for others in this simplified view
-        
-        return { ...SKILL_DETAILS[key], id: key, level: calcLevel(xp), iconName: SKILL_DETAILS[key].iconName || 'Circle' };
+        else if(key === 'vit') xp = vitXP;
+        else if(key === 'wis') xp = wisXP;
+        else if(key === 'net') xp = netXP;
+        else if(key === 'ast') xp = astXP;
+        else if(key === 'flo') xp = floXP;
+        else if(key === 'inv') xp = invXP;
+        else if(key === 'est') xp = estXP;
+        else if(key === 'dis') xp = disXP;
+
+        return { ...SKILL_DETAILS[key], id: key, level: calcLevel(xp), iconName: SKILL_DETAILS[key].icon || 'Circle' };
     });
-  }, [data.monthlyIncome, data.assets, data.cash, data.monthlyExpenses, data.bonusXP]);
+  }, [data.monthlyIncome, data.assets, data.cash, data.monthlyExpenses, data.bonusXP, data.achievements]);
 
   const combatStats = useMemo(() => {
     const totalLevel = playerSkills.reduce((sum, s) => sum + s.level, 0);
-    // Simplified combat level calc
     const combatLevel = Math.floor(totalLevel / 4);
     return { totalLevel, combatLevel };
   }, [playerSkills]);
-
-  // --- UI HELPERS ---
-  const updateAsset = (key, value) => setData(prev => ({ ...prev, assets: { ...prev.assets, [key]: parseInt(value) || 0 } }));
-  const toggleWidget = (key) => setData(prev => ({ ...prev, widgetConfig: { ...prev.widgetConfig, [key]: !prev.widgetConfig?.[key] } }));
   
-  const toggleAchievement = (id) => {
-    const achievement = data.achievements.find(a => a.id === id);
-    if(!achievement) return;
-    const isCompleting = !achievement.completed;
-    setData(prev => ({
-      ...prev,
-      achievements: prev.achievements.map(a => a.id === id ? { ...a, completed: !a.completed } : a)
-    }));
-    if (isCompleting) {
-      setRewardModal(achievement);
-      showToast(`Unlocked: ${achievement.title}`, 'success');
-    }
-  };
-
-  const activeContracts = data.achievements.filter(a => !a.completed);
-  const completedContracts = data.achievements.filter(a => a.completed);
+  const activeContracts = (data.achievements || []).filter(a => !a.completed);
+  const completedContracts = (data.achievements || []).filter(a => a.completed);
   const sortedActive = [...activeContracts].sort((a,b) => a.xp - b.xp); 
   const priorityContract = sortedActive[0] || { title: "All Complete", desc: "You are a legend.", xp: 0 };
   const displayContracts = questFilter === 'active' ? sortedActive : 
                          questFilter === 'completed' ? completedContracts : 
                          [...sortedActive, ...completedContracts];
 
-  const handleDragStart = (e, widgetId, column, context) => { 
-      if (!editMode) return; 
-      setDragItem({ id: widgetId, column, context }); 
-      e.dataTransfer.effectAllowed = 'move'; 
-  };
-  
-  const handleDragOver = (e) => { if (!editMode) return; e.preventDefault(); };
-  
-  const handleDrop = (e, targetColumn, targetIndex, context) => {
-    if (!editMode || !dragItem || dragItem.context !== context) return;
-    const newLayout = { ...data.layout };
-    const layoutKey = context; 
-    
-    if (!newLayout[layoutKey] || !newLayout[layoutKey][dragItem.column]) return;
 
-    const sourceList = [...newLayout[layoutKey][dragItem.column]];
-    const targetList = dragItem.column === targetColumn ? sourceList : [...newLayout[layoutKey][targetColumn]];
-    const itemIndex = sourceList.indexOf(dragItem.id);
-    
-    if (itemIndex === -1) return;
-    
-    sourceList.splice(itemIndex, 1);
-    if (dragItem.column === targetColumn) { targetList.splice(targetIndex, 0, dragItem.id); newLayout[layoutKey][targetColumn] = targetList; }
-    else { targetList.splice(targetIndex, 0, dragItem.id); newLayout[layoutKey][dragItem.column] = sourceList; newLayout[layoutKey][targetColumn] = targetList; }
-    setData(prev => ({ ...prev, layout: newLayout }));
-    setDragItem(null);
-  };
-
+  // --- UI RENDERERS ---
+  
+  const updateAsset = (key, value) => setData(prev => ({ ...prev, assets: { ...prev.assets, [key]: parseInt(value) || 0 } }));
+  const toggleWidget = (key) => setData(prev => ({ ...prev.widgetConfig, [key]: !prev.widgetConfig?.[key] }));
+  
   const renderWidget = (widgetId) => {
     const isVisible = data.widgetConfig?.[widgetId];
     if (!isVisible && !editMode) return null;
@@ -409,7 +411,7 @@ export default function VaultDashboard() {
                  <h3 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2"><RenderIcon name="ShoppingBag" size={14}/> Black Market</h3>
                  <div className="flex gap-1">
                     {['boosters', 'gear', 'packs'].map(tab => (
-                        <button key={tab} onClick={() => setMiniShopTab(tab)} className={`px-2 py-1 text-[10px] uppercase font-bold rounded ${miniShopTab === tab ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white'}`}>{tab}</button>
+                        <button key={tab} onClick={() => setMiniShopTab(tab)} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${miniShopTab === tab ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white'}`}>{tab}</button>
                     ))}
                  </div>
              </div>
@@ -429,47 +431,36 @@ export default function VaultDashboard() {
       case 'player_card': return (<div className={`${commonWrapperClass} p-4 h-fit`}>{toggleBtn}{dragHandle}<div className="flex items-center gap-3 mb-4"><div className="w-12 h-12 rounded bg-slate-700 flex items-center justify-center text-2xl">🧙‍♂️</div><div><div className="font-bold text-white">Lvl {Math.floor(combatStats.totalLevel/3)} Architect</div><div className="text-xs text-amber-500 font-mono">Combat: {combatStats.combatLevel}</div></div></div><div className="text-xs text-slate-400 space-y-1"><div className="flex justify-between"><span>Total Level:</span> <span className="text-white">{combatStats.totalLevel} / {MAX_TOTAL_LEVEL}</span></div><div className="flex justify-between"><span>Contracts:</span> <span className="text-white">{data.achievements.filter(a=>a.completed).length}</span></div></div></div>);
       case 'p_vitals': return (<div className={`${commonWrapperClass} p-4 h-fit`}>{toggleBtn}{dragHandle}<h3 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2 pl-4"><RenderIcon name="Activity" size={14}/> Daily Vitals</h3><div className="space-y-4"><WellnessBar label="Energy" value={data.wellness.energy} iconName="Zap" color="bg-yellow-400" onFill={() => updateWellness('energy', 20)} task="Sleep 8h" /><WellnessBar label="Hydration" value={data.wellness.hydration} iconName="Droplet" color="bg-blue-400" onFill={() => updateWellness('hydration', 20)} task="Drink Water" /><WellnessBar label="Focus" value={data.wellness.focus} iconName="Brain" color="bg-purple-400" onFill={() => updateWellness('focus', 20)} task="Deep Work" /></div></div>);
       case 'financial_overview': return (<div className={`${commonWrapperClass} p-6 h-fit`}>{toggleBtn}{dragHandle}<h3 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2 pl-4"><RenderIcon name="Lock" size={14}/> Financial War Room</h3><div className="grid grid-cols-2 gap-4 mb-6"><div className="bg-black/20 p-3 rounded"><div className="text-[10px] text-slate-400">NET WORTH</div><div className="font-mono text-lg text-white">${financials.netWorth.toLocaleString()}</div></div><div className="bg-black/20 p-3 rounded"><div className="text-[10px] text-slate-400">RUNWAY</div><div className="font-mono text-lg text-emerald-400">{financials.runwayMonths}m</div></div></div><div className="space-y-4"><AssetBar label="Real Estate" value={data.assets.realEstate} total={financials.totalAssets} color="#10b981" /><AssetBar label="Digital IP" value={data.assets.digitalIP} total={financials.totalAssets} color="#3b82f6" /><AssetBar label="Metals" value={data.assets.metals} total={financials.totalAssets} color={colors.accentPrimary} /><AssetBar label="Crypto" value={data.assets.crypto} total={financials.totalAssets} color="#a855f7" /></div></div>);
-      case 'unified_menu': return (<div className={`${commonWrapperClass} p-6 h-fit flex flex-col`}>{toggleBtn}{dragHandle}<div className="flex space-x-2 mb-6 border-b border-slate-700 pb-2 overflow-x-auto pl-4">{['skills', 'inventory'].map(tab => <button key={tab} onClick={() => setProfileWidgetTab(tab)} className={`text-[10px] font-bold uppercase px-3 py-2 rounded transition-all whitespace-nowrap ${profileWidgetTab === tab ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`}>{tab}</button>)}</div>{profileWidgetTab === 'skills' && <SkillMatrix skills={playerSkills} onItemClick={setSkillModal} />}{profileWidgetTab === 'inventory' && <InventoryGrid inventory={data.inventory} mp={data.discipline} onUseItem={handleUseItem} />}</div>);
+      case 'unified_menu': return (<div className={`${commonWrapperClass} p-6 h-fit flex flex-col`}>{toggleBtn}{dragHandle}<div className="flex space-x-2 mb-6 border-b border-slate-700 pb-2 overflow-x-auto pl-4">{['skills', 'inventory', 'mastery_log'].map(tab => ( // Added Mastery Log Button
+                   <button key={tab} onClick={() => { setProfileWidgetTab(tab); if (tab === 'mastery_log') setMasteryLogOpen(true); }} className={`px-3 py-1.5 rounded transition-all whitespace-nowrap text-[10px] font-bold uppercase ${profileWidgetTab === tab ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`}>
+                      {tab === 'mastery_log' ? 'Mastery Log' : tab}
+                   </button>
+                ))}</div><SkillMatrix skills={playerSkills} onItemClick={setSkillModal} />{homeWidgetTab === 'inventory' && <InventoryGrid inventory={data.inventory} mp={data.discipline} onUseItem={handleUseItem} />}</div>);
       case 'active_contracts': return (<div className={`${commonWrapperClass} p-0 h-fit`}>{toggleBtn}{dragHandle}<div className="p-4"><h3 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2"><RenderIcon name="Flame" size={14}/> Active Contracts</h3><ContractWidget contracts={displayContracts} onToggle={toggleAchievement} title="" /></div></div>);
-      case 'collection': return (<div className={`${commonWrapperClass} p-6 h-fit`}>{toggleBtn}{dragHandle}<CollectionBinder cards={data.cards} onSell={sellCard} /></div>);
+      case 'collection': return (<div className={`${commonWrapperClass} p-6 h-fit`}>{toggleBtn}{dragHandle}<CollectionBinder cards={data.cards} onSell={handleSellCard} /></div>);
 
       default: return null;
     }
   };
 
-  // --- RENDER ---
+
+
+  // --- RENDER MAIN ---
   return (
     <div className="min-h-screen text-slate-200 font-sans selection:bg-[#e1b542] selection:text-black pb-10" style={{ backgroundColor: colors.bg }}>
-      {toast && <div className="fixed top-20 right-4 z-[100] bg-[#232a3a] border border-amber-500 text-white px-4 py-3 rounded shadow-xl animate-in slide-in-from-right flex items-center gap-2"><RenderIcon name="Zap" size={16} className="text-amber-500" /> <span className="text-sm font-bold">{toast.msg}</span></div>}
+      {/* Toast, Modals, Header... (Keep existing) */}
+      {toast && <div className="fixed top-20 right-4 z-[100] bg-[#232a3a] border border-amber-500 text-white px-4 py-3 rounded shadow-xl"><RenderIcon name="Zap" size={16} className="text-amber-500" /> <span className="text-sm font-bold">{toast.msg}</span></div>}
       
-      {/* PACK OPENING MODAL */}
-      {packOpening && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 backdrop-blur-lg p-8" onClick={() => setPackOpening(null)}>
-           <div className="text-center w-full max-w-4xl">
-              <h2 className="text-3xl font-bold text-white mb-10 animate-bounce">PACK OPENED!</h2>
-              <div className="flex justify-center gap-6 flex-wrap">
-                 {packOpening.map((card, i) => (
-                    <div key={i} className={`w-48 aspect-[2/3] rounded-xl border-2 flex flex-col items-center justify-center p-4 bg-[#1e1e1e] animate-in zoom-in duration-500 delay-${i*200} ${getRarityColor(card.rarity)}`}>
-                       <div className="mb-4"><RenderIcon name={card.iconName} size={32} /></div>
-                       <div className="font-bold text-lg mb-2">{card.name}</div>
-                       <div className="text-xs uppercase tracking-wider opacity-70 mb-4">{card.rarity}</div>
-                       <div className="text-xs text-center opacity-80">{card.desc}</div>
-                    </div>
-                 ))}
-              </div>
-              <div className="mt-12 text-slate-500 text-sm">Click anywhere to close</div>
-           </div>
-        </div>
-      )}
-
+      {/* Modals: Skill Detail and Mastery Log */}
       {skillModal && <SkillDetailModal skill={skillModal} onClose={() => setSkillModal(null)} colors={colors} />}
       {masteryLogOpen && <MasteryLogModal onClose={() => setMasteryLogOpen(false)} skills={playerSkills} colors={colors} />}
 
       {/* HEADER */}
       <header className="p-4 sticky top-0 z-50 shadow-xl" style={{ backgroundColor: colors.bg, borderBottom: `1px solid ${colors.border}` }}>
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('dynamic')}>
-            <div className="p-2 rounded-lg text-black shadow-lg hover:scale-105 transition-transform" style={{ backgroundColor: colors.accentPrimary, boxShadow: `0 0 15px ${colors.accentPrimary}40` }}><RenderIcon name="Shield" size={24} /></div>
+           {/* Title */}
+           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('dynamic')}>
+            <div className="p-2 rounded-lg text-black bg-amber-500"><RenderIcon name="Shield" size={24} /></div>
             <div>
               <h1 className="text-xl font-bold tracking-wider text-white">THE VAULT</h1>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-mono text-slate-400 mt-1">
@@ -483,12 +474,16 @@ export default function VaultDashboard() {
               </div>
             </div>
           </div>
-          <nav className="flex p-1 rounded-lg" style={{ border: `1px solid ${colors.border}`, backgroundColor: '#232a3a' }}>
+
+           {/* Navigation */}
+           <nav className="flex p-1 rounded-lg" style={{ border: `1px solid ${colors.border}`, backgroundColor: '#232a3a' }}>
             {[ 
               { id: 'dynamic', icon: "LayoutDashboard", label: 'HOME' }, 
               { id: 'profile', icon: "User", label: 'PROFILE' }, 
               { id: 'shop', icon: "ShoppingBag", label: 'SHOP' }, 
               { id: 'inventory', icon: "Package", label: 'INVENTORY' },
+              { id: 'stats', icon: "Activity", label: 'STATS' }, 
+              { id: 'estate', icon: "Home", label: 'ESTATE' }, // Fixed: Added Estate Tab
               { id: 'inputs', icon: "Code", label: 'INPUTS' } 
             ].map((tab) => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-2" style={{ backgroundColor: activeTab === tab.id ? colors.accentPrimary : 'transparent', color: activeTab === tab.id ? '#000' : '#94a3b8' }}>
@@ -499,76 +494,92 @@ export default function VaultDashboard() {
         </div>
       </header>
 
-      {/* MAIN CONTENT */}
       <main className="max-w-6xl mx-auto p-4 md:p-8 relative">
-        
-        {/* HOME */}
-        {activeTab === 'dynamic' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in">
-             <div className="lg:col-span-2 space-y-6">
-                {data.layout.home.left.map((widgetId, i) => (
-                   <div key={i}>{renderWidget(widgetId)}</div>
-                ))}
+         
+         {/* DYNAMIC TAB (Home) */}
+         {activeTab === 'dynamic' && (
+             <div className="animate-in fade-in duration-500">
+                <div className="flex justify-end mb-4">
+                    {editMode && (
+                       <div className="bg-[#1e1e1e] border border-slate-700 rounded-lg p-2 flex gap-2 mr-4 items-center shadow-xl animate-in fade-in zoom-in">
+                          <div className="text-xs font-bold text-slate-400 px-2 uppercase tracking-wider border-r border-slate-700 mr-1">Interface Config</div>
+                          {['daily_ops', 'contract', 'skills', 'shop'].map(k => (
+                             <button key={k} onClick={() => toggleWidget(k)} className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${data.widgetConfig[k] ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>{k.replace('_',' ')}</button>
+                          ))}
+                       </div>
+                    )}
+                    <button onClick={() => setEditMode(!editMode)} className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold border transition-all ${editMode ? 'bg-amber-500 text-black border-amber-500' : 'bg-transparent text-slate-400 border-slate-700'}`}><RenderIcon name="Edit3" size={14} /> {editMode ? 'DONE' : 'EDIT LAYOUT'}</button>
+                 </div>
+                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                     <div className="lg:col-span-2 space-y-6" onDragOver={(e) => handleDragOver(e)} onDrop={(e) => handleDrop(e, 'left', 0, 'home')}>
+                        {data.layout.home.left.map((widgetId, i) => (
+                           <div key={i} draggable={editMode} onDragStart={(e) => handleDragStart(e, widgetId, 'left', 'home')} onDrop={(e) => { e.stopPropagation(); handleDrop(e, 'left', i, 'home'); }} onDragOver={(e) => handleDragOver(e)}>
+                              {renderWidget(widgetId)}
+                           </div>
+                        ))}
+                     </div>
+                     <div className="space-y-6" onDragOver={(e) => handleDragOver(e)} onDrop={(e) => handleDrop(e, 'right', 0, 'home')}>
+                        {data.layout.home.right.map((widgetId, i) => (
+                           <div key={i} draggable={editMode} onDragStart={(e) => handleDragStart(e, widgetId, 'right', 'home')} onDrop={(e) => { e.stopPropagation(); handleDrop(e, 'right', i, 'home'); }} onDragOver={(e) => handleDragOver(e)}>
+                              {renderWidget(widgetId)}
+                           </div>
+                        ))}
+                     </div>
+                 </div>
              </div>
-             <div className="space-y-6">
-                {data.layout.home.right.map((widgetId, i) => (
-                   <div key={i}>{renderWidget(widgetId)}</div>
-                ))}
-             </div>
-          </div>
-        )}
+         )}
 
-        {/* SHOP */}
-        {activeTab === 'shop' && (
-          <div className="animate-in fade-in duration-500">
-             <div className="flex gap-4 mb-6">
-                {['boosters', 'gear', 'packs'].map(tab => (
-                   <button key={tab} onClick={() => setShopTab(tab)} className={`px-6 py-3 rounded-lg font-bold uppercase text-sm transition-all ${shopTab === tab ? 'bg-amber-500 text-black' : 'bg-[#1e1e1e] text-slate-400 hover:text-white'}`}>{tab}</button>
-                ))}
-             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {SHOP_ITEMS[shopTab].map(item => (
-                   <div key={item.id} className="bg-[#1e1e1e] rounded-xl p-6 border border-slate-700 hover:border-amber-500 transition-all group relative overflow-hidden">
-                      <div className="absolute top-0 right-0 bg-emerald-900/50 text-emerald-400 text-xs font-bold px-3 py-1 rounded-bl-lg border-b border-l border-emerald-900">{item.cost} DSC</div>
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 ${item.color} bg-black/30`}><RenderIcon name={item.iconName} size={24} /></div>
-                      <h3 className="text-lg font-bold text-white mb-1">{item.name}</h3>
-                      <p className="text-sm text-slate-400 mb-4">{item.effect}</p>
-                      <button onClick={() => purchaseItem(item, shopTab)} className="w-full py-2 rounded bg-slate-800 hover:bg-emerald-600 text-white font-bold transition-colors">PURCHASE</button>
-                   </div>
-                ))}
-             </div>
-          </div>
-        )}
+         {/* STATS TAB */}
+         {activeTab === 'stats' && (
+             <StatisticsTab stats={data.statistics} />
+         )}
 
-        {/* INVENTORY */}
-        {activeTab === 'inventory' && (
-          <div className="animate-in fade-in duration-500 h-[calc(100vh-140px)]">
-             <InventoryView 
-                inventory={data.inventory} 
-                bank={data.bank} 
-                bankBalance={data.bankBalance}
-                cards={data.cards} 
-                discipline={data.discipline} 
-                onUpdateInventory={(inv) => setData(p => ({...p, inventory: inv}))}
-                onUpdateBank={(bank) => setData(p => ({...p, bank}))}
-                onUpdateBankBalance={(bal) => setData(p => ({...p, bankBalance: bal}))}
-                onUpdateCards={(cards) => setData(p => ({...p, cards}))}
-                onUpdateDiscipline={(dsc) => setData(p => ({...p, discipline: dsc}))}
-                onUseItem={handleUseItem}
-                INVENTORY_SLOTS={INVENTORY_SLOTS}
-             />
-          </div>
-        )}
+         {/* ESTATE TAB */}
+         {activeTab === 'estate' && (
+            <div className="animate-in fade-in duration-500 h-[calc(100vh-140px)]">
+                <EstatePrototype 
+                  discipline={data.discipline} 
+                  setDiscipline={(valOrFn) => handleSetDiscipline(valOrFn)} 
+                />
+            </div>
+         )}
 
-        {/* PROFILE - RESTORED EDIT CONTROLS */}
-        {activeTab === 'profile' && (
+         {/* INVENTORY TAB */}
+         {activeTab === 'inventory' && (
+            <div className="animate-in fade-in duration-500 h-[calc(100vh-140px)]">
+                <InventoryView 
+                    inventory={data.inventory} 
+                    bank={data.bank} 
+                    bankBalance={data.bankBalance}
+                    cards={data.cards} 
+                    discipline={data.discipline} 
+                    onUpdateInventory={(inv) => setData(p => ({...p, inventory: inv}))}
+                    onUpdateBank={(bank) => setData(p => ({...p, bank}))}
+                    onUpdateBankBalance={(bal) => setData(p => ({...p, bankBalance: bal}))}
+                    onUpdateCards={(cards) => setData(p => ({...p, cards}))}
+                    onUpdateDiscipline={(dsc) => setData(p => ({...p, discipline: dsc}))}
+                    onUseItem={handleUseItem}
+                    INVENTORY_SLOTS={INVENTORY_SLOTS}
+                />
+            </div>
+         )}
+
+         {/* SHOP TAB (RESTORED FULL PAGE) */}
+         {activeTab === 'shop' && (
+             <ShopFullPage onPurchase={purchaseItem} discipline={data.discipline} />
+         )}
+         
+         {/* PROFILE TAB */}
+         {activeTab === 'profile' && (
           <div className="space-y-6 animate-in fade-in duration-500">
              <div className="flex justify-end mb-4">
                 {editMode && (
                    <div className="bg-[#1e1e1e] border border-slate-700 rounded-lg p-2 flex gap-2 mr-4 items-center shadow-xl animate-in fade-in zoom-in">
                       <div className="text-xs font-bold text-slate-400 px-2 uppercase tracking-wider border-r border-slate-700 mr-1">Profile Config</div>
-                      {['player_card', 'p_vitals', 'financial_overview', 'unified_menu', 'active_contracts', 'collection'].map(k => (
-                         <button key={k} onClick={() => toggleWidget(k)} className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${data.widgetConfig[k] ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>{k.replace(/_/g,' ')}</button>
+                      {['player_card', 'p_vitals', 'financial_overview', 'unified_menu', 'active_contracts', 'collection', 'mastery_log_btn'].map(k => ( // Added mastery_log_btn to config menu
+                         <button key={k} onClick={() => toggleWidget(k)} className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${data.widgetConfig[k] ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+                           {k === 'mastery_log_btn' ? 'Mastery Log' : k.replace(/_/g,' ')}
+                         </button>
                       ))}
                    </div>
                 )}
@@ -600,16 +611,11 @@ export default function VaultDashboard() {
              </div>
           </div>
         )}
-
-        {/* INPUTS - RESTORED FULL FIELDS */}
-        {activeTab === 'inputs' && (
-          <div className="p-6 rounded-xl max-w-4xl mx-auto bg-[#2b3446] border border-[#404e6d] animate-in fade-in duration-500">
-             <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold text-white">Update Vital Signs</h2><div className="text-xs text-slate-500 flex items-center gap-1"><RenderIcon name="Save" size={12}/> Auto-saving active</div></div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+         {activeTab === 'inputs' && (
+             <div className="p-6 rounded-xl max-w-4xl mx-auto bg-[#2b3446] border border-[#404e6d] animate-in fade-in duration-500">
                  <InputGroup title="Liquid & Income">
                      <InputField label="Cash on Hand ($)" value={data.cash} onChange={(v) => setData({...data, cash: parseInt(v)||0})} />
                      <InputField label="Monthly Income ($)" value={data.monthlyIncome} onChange={(v) => setData({...data, monthlyIncome: parseInt(v)||0})} />
-                     <InputField label="Monthly Expenses ($)" value={data.monthlyExpenses} onChange={(v) => setData({...data, monthlyExpenses: parseInt(v)||0})} />
                  </InputGroup>
                  <InputGroup title="Investments & Assets">
                      <InputField label="Real Estate Equity ($)" value={data.assets.realEstate} onChange={(v) => updateAsset('realEstate', v)} />
@@ -626,9 +632,8 @@ export default function VaultDashboard() {
                     <InputField label="Total Audience Size" value={data.assets.audience} onChange={(v) => updateAsset('audience', v)} />
                  </InputGroup>
              </div>
-             <button onClick={() => { if(window.confirm("Reset data?")) { localStorage.removeItem('vault_data_v27.1'); window.location.reload(); } }} className="mt-8 flex items-center gap-2 text-xs text-red-400 hover:text-red-300"><RenderIcon name="Trash2" size={14}/> Factory Reset</button>
-          </div>
-        )}
+         )}
+
       </main>
     </div>
   );
