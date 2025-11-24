@@ -9,9 +9,11 @@ import {
 // 2. UI Components Import
 import { 
   WellnessBar, InventoryGrid, ContractWidget, CollectionBinder, 
-  SkillMatrix, AssetBar, InputGroup, InputField, SkillDetailModal, 
-  MasteryLogModal 
-} from './dashboardui';
+  SkillMatrix, AssetBar, InputGroup, InputField, SkillCard, 
+  MasteryModal, 
+  SkillDetailModal,
+  MasteryLogWidget // IMPORTED NEW STANDALONE WIDGET
+} from '../../components/dashboard/dashboardui'; // FIX: Ensure relative path is correct
 
 // 3. Utils Import
 import { RenderIcon, getRarityColor, getRarityGradient, IconMap } from './dashboardutils';
@@ -23,10 +25,11 @@ import ShopFullPage from './shopfullpage';
 import EstatePrototype from './estateprototype'; 
 
 export default function VaultDashboard() {
-  // --- STATE INITIALIZATION ---
+  // --- STATE INITIALIZATION (Uses updated initialData from gamedata.js) ---
   const [data, setData] = useState(() => {
     try {
-      const saved = localStorage.getItem('vault_data_v28.0'); 
+      // FIX: Changed local storage key to force loading new initial data (v29.1)
+      const saved = localStorage.getItem('vault_data_v29.1'); 
       const loaded = saved ? JSON.parse(saved) : initialData;
       
       const safe = { 
@@ -39,8 +42,11 @@ export default function VaultDashboard() {
           liabilities: { ...initialData.liabilities, ...(loaded.liabilities || {}) },
           inventory: Array.isArray(loaded.inventory) ? loaded.inventory : initialData.inventory,
           bank: Array.isArray(loaded.bank) ? loaded.bank : initialData.bank,
-          achievements: Array.isArray(loaded.achievements) ? loaded.achievements : initialData.achievements
+          achievements: Array.isArray(loaded.achievements) ? loaded.achievements : initialData.achievements,
+          lifetime: { ...initialData.lifetime, ...(loaded.lifetime || {}) }
       };
+
+      if (!safe.lifetime.claimedMasteryRewards) safe.lifetime.claimedMasteryRewards = initialData.lifetime.claimedMasteryRewards;
 
       if (safe.inventory.length !== INVENTORY_SLOTS) {
          const fixed = new Array(INVENTORY_SLOTS).fill(null);
@@ -81,7 +87,8 @@ export default function VaultDashboard() {
   const colors = { bg: "#2b3446", border: "#404e6d", accentSecondary: "#78643e", accentPrimary: "#e1b542" };
 
   useEffect(() => {
-    localStorage.setItem('vault_data_v28.0', JSON.stringify(data));
+    // FIX: Using new key to ensure fresh data load 
+    localStorage.setItem('vault_data_v29.1', JSON.stringify(data));
   }, [data]);
 
   // --- VITAL DECAY LOOP ---
@@ -112,7 +119,6 @@ export default function VaultDashboard() {
     });
   };
 
-  // FIX: Correctly update widget config without destroying the rest of 'data'
   const toggleWidget = (key) => {
     setData(prev => ({ 
         ...prev,
@@ -123,12 +129,10 @@ export default function VaultDashboard() {
     }));
   };
 
-  // FIX: Add Missing Drag & Drop Handlers to prevent crashes
   const handleDragStart = (e, widgetId, column, tab) => {
     e.dataTransfer.setData("widgetId", widgetId);
     e.dataTransfer.setData("sourceColumn", column);
     e.dataTransfer.setData("sourceTab", tab);
-    // Store local state for visual feedback if needed
     setDragItem({ widgetId, column, tab });
   };
 
@@ -142,22 +146,15 @@ export default function VaultDashboard() {
     const sourceColumn = e.dataTransfer.getData("sourceColumn");
     const sourceTab = e.dataTransfer.getData("sourceTab");
 
-    // Basic validation
     if (!widgetId || !data.layout[targetTab]) return;
 
     setData(prev => {
-        const newLayout = JSON.parse(JSON.stringify(prev.layout)); // Deep copy to avoid mutation
-        
-        // 1. Remove from Source
+        const newLayout = JSON.parse(JSON.stringify(prev.layout)); 
         const sourceList = newLayout[sourceTab][sourceColumn];
         const filteredSource = sourceList.filter(id => id !== widgetId);
         newLayout[sourceTab][sourceColumn] = filteredSource;
 
-        // 2. Add to Target
-        // Note: logic handles moving between columns or within same column
         const targetList = newLayout[targetTab][targetColumn];
-        
-        // If same list, we need to handle index carefully because 'filteredSource' already removed it
         if (sourceTab === targetTab && sourceColumn === targetColumn) {
             targetList.splice(targetIndex, 0, widgetId);
         } else {
@@ -206,8 +203,6 @@ export default function VaultDashboard() {
       return newCards;
   };
 
-  // --- ACTIONS WITH STAT TRACKING ---
-
   const updateWellness = (type, amount) => {
     const now = new Date().toDateString();
     setData(prev => {
@@ -230,12 +225,17 @@ export default function VaultDashboard() {
 
   const manualGrind = (skillKey, mpReward, energyCost) => {
     if (data.wellness.energy >= energyCost) {
-      setData(prev => ({
-        ...prev,
-        wellness: { ...prev.wellness, energy: prev.wellness.energy - energyCost },
-        bonusXP: { ...prev.bonusXP, [skillKey]: (prev.bonusXP?.[skillKey] || 0) + 10 },
-        discipline: prev.discipline + mpReward
-      }));
+      setData(prev => {
+        const newIncomeBase = (skillKey === 'inc') ? prev.lifetime.totalIncomeBase + (mpReward * 12) : prev.lifetime.totalIncomeBase;
+        
+        return ({
+          ...prev,
+          wellness: { ...prev.wellness, energy: prev.wellness.energy - energyCost },
+          bonusXP: { ...prev.bonusXP, [skillKey]: (prev.bonusXP?.[skillKey] || 0) + 10 },
+          discipline: prev.discipline + mpReward,
+          lifetime: { ...prev.lifetime, totalIncomeBase: newIncomeBase }
+        });
+      });
       showToast(`+10 ${skillKey.toUpperCase()} XP | +${mpReward} DSC`, 'success');
     } else {
       showToast("Not enough energy!", 'error');
@@ -339,8 +339,37 @@ export default function VaultDashboard() {
 
     if (isCompleting) { showToast(`Completed: ${achievement.title}${rewardMsg}`, 'success'); }
   };
+  
+  const handleClaimMasteryReward = (skillId, level, reward) => {
+      let newInventory = [...data.inventory];
+      let newBonusXP = { ...data.bonusXP };
+      let newDiscipline = data.discipline;
 
-  // --- MEMOIZED DATA ---
+      if (reward.type === 'Item' || reward.type === 'Gear' || reward.type === 'Trophy' || reward.type === 'Consumable') {
+          const updatedInv = addToSlotArray(newInventory, reward, 1);
+          if (!updatedInv) { showToast("Inventory Full! Cannot claim reward.", 'error'); return; }
+          newInventory = updatedInv;
+      } else if (reward.type === 'Discipline') {
+          newDiscipline += reward.amount;
+      }
+
+      setData(prev => ({
+          ...prev,
+          discipline: newDiscipline,
+          inventory: newInventory,
+          bonusXP: newBonusXP,
+          lifetime: {
+              ...prev.lifetime,
+              claimedMasteryRewards: {
+                  ...prev.lifetime.claimedMasteryRewards,
+                  [skillId]: [...(prev.lifetime.claimedMasteryRewards[skillId] || []), level]
+              }
+          }
+      }));
+      setSkillModal(null); 
+      showToast(`Reward Claimed: ${reward.name} (+1 item)`, 'success');
+  };
+
   const financials = useMemo(() => {
       const totalAssets = Object.values(data.assets || {}).reduce((a, b) => Number(a || 0) + Number(b || 0), 0) + Number(data.cash || 0);
       const totalLiabilities = Object.values(data.liabilities || {}).reduce((a, b) => Number(a || 0) + Number(b || 0), 0);
@@ -350,42 +379,93 @@ export default function VaultDashboard() {
       return { totalAssets, totalLiabilities, netWorth, monthlyCashFlow, runwayMonths };
   }, [data.assets, data.cash, data.liabilities, data.monthlyIncome, data.monthlyExpenses]);
 
-  const playerSkills = useMemo(() => {
+  const updateAsset = (key, value) => {
+    const newValue = parseInt(value) || 0;
+    setData(prev => {
+      const oldValue = prev.assets[key] || 0;
+      let costIncrease = 0;
+      
+      if (newValue > oldValue) {
+          costIncrease = newValue - oldValue;
+      }
+      
+      return { 
+          ...prev, 
+          assets: { ...prev.assets, [key]: newValue },
+          lifetime: {
+              ...prev.lifetime,
+              totalAssetAcquisitionCost: prev.lifetime.totalAssetAcquisitionCost + costIncrease 
+          }
+      };
+    });
+  };
+
+  const updateLiability = (key, value) => {
+    const newValue = parseInt(value) || 0;
+    setData(prev => {
+        const oldValue = prev.liabilities[key] || 0;
+        const debtPaid = Math.max(0, oldValue - newValue);
+
+        return {
+            ...prev,
+            liabilities: { ...prev.liabilities, [key]: newValue },
+            lifetime: {
+                ...prev.lifetime,
+                totalDebtPrincipalPaid: prev.lifetime.totalDebtPrincipalPaid + debtPaid
+            }
+        };
+    });
+  };
+
+
+  const playerSkillsMemo = useMemo(() => {
     const calcLevel = (xp) => Math.max(1, Math.min(Math.floor(25 * Math.log10((xp / 100) + 1)), 99));
     const getXP = (base, id) => (Number(base) || 0) + (data.bonusXP?.[id] || 0);
     
-    const incXP = getXP((data.monthlyIncome || 0) * 12, 'inc');
+    const incXP = getXP(data.lifetime.totalIncomeBase * 10, 'inc'); 
     const codXP = getXP(35000 + ((data.assets?.digitalIP || 0) * 5), 'cod');
     const cntXP = getXP(15000 + ((data.assets?.audience || 0) * 50), 'cnt');
-    const secXP = getXP((data.cash || 0) + (((data.cash || 0) / (data.monthlyExpenses || 1)) * 5000), 'sec');
+    
+    const secXP = getXP((data.cash || 0) + (data.lifetime.totalDebtPrincipalPaid * 10), 'sec');
+    
+    const astXP = getXP(data.lifetime.totalAssetAcquisitionCost * 5, 'ast');
+
+    const currentCashFlowValue = (data.monthlyIncome || 0) - (data.monthlyExpenses || 0);
+    const updatedPeakFlow = Math.max(data.lifetime.peakCashFlow, currentCashFlowValue * 20); 
+    const floXP = getXP(updatedPeakFlow, 'flo');
+    
     const vitXP = getXP(85000, 'vit');
     const wisXP = getXP(30000 + (data.achievements.filter(a => a.completed).length * 5000), 'wis');
     const netXP = getXP(15000 + ((data.assets?.audience || 0) * 100), 'net');
-    const astXP = getXP((data.assets?.crypto || 0) + (data.assets?.metals || 0), 'ast');
-    const floXP = getXP(((data.monthlyIncome || 0) - (data.monthlyExpenses || 0)) * 20, 'flo');
     const invXP = getXP(Math.max((data.assets?.stocks || 0) + (data.assets?.crypto || 0), 0), 'inv');
     const estXP = getXP((data.assets?.realEstate || 0), 'est');
     const disXP = getXP(0, 'dis');
-    
-    return Object.keys(SKILL_DETAILS).map(key => {
-        let xp = 0;
-        if(key === 'inc') xp = incXP;
-        else if(key === 'cod') xp = codXP;
-        else if(key === 'cnt') xp = cntXP;
-        else if(key === 'ai') xp = getXP(40000, 'ai');
-        else if(key === 'sec') xp = secXP;
-        else if(key === 'vit') xp = vitXP;
-        else if(key === 'wis') xp = wisXP;
-        else if(key === 'net') xp = netXP;
-        else if(key === 'ast') xp = astXP;
-        else if(key === 'flo') xp = floXP;
-        else if(key === 'inv') xp = invXP;
-        else if(key === 'est') xp = estXP;
-        else if(key === 'dis') xp = disXP;
+    const aiXP = getXP(40000, 'ai');
 
-        return { ...SKILL_DETAILS[key], id: key, level: calcLevel(xp), iconName: SKILL_DETAILS[key].icon || 'Circle' };
+    if (updatedPeakFlow > data.lifetime.peakCashFlow) {
+        setData(prev => ({ 
+            ...prev, 
+            lifetime: { ...prev.lifetime, peakCashFlow: updatedPeakFlow } 
+        }));
+    }
+
+    const skillXpMap = {
+        inc: incXP, cod: codXP, cnt: cntXP, ai: aiXP, sec: secXP, vit: vitXP, 
+        wis: wisXP, net: netXP, ast: astXP, flo: floXP, inv: invXP, est: estXP, dis: disXP
+    };
+
+    const totalXPs = skillXpMap;
+    
+    const calculatedSkills = Object.keys(SKILL_DETAILS).map(key => {
+        let xp = skillXpMap[key] || 0;
+        return { ...SKILL_DETAILS[key], id: key, level: calcLevel(xp), iconName: SKILL_DETAILS[key].icon || 'Circle', color: SKILL_DETAILS[key].color };
     });
-  }, [data.monthlyIncome, data.assets, data.cash, data.monthlyExpenses, data.bonusXP, data.achievements]);
+
+    return { calculatedSkills, totalXPs };
+
+  }, [data.monthlyIncome, data.assets, data.cash, data.monthlyExpenses, data.bonusXP, data.achievements, data.lifetime]);
+  
+  const { calculatedSkills: playerSkills, totalXPs } = playerSkillsMemo; 
 
   const combatStats = useMemo(() => {
     const totalLevel = playerSkills.reduce((sum, s) => sum + s.level, 0);
@@ -404,13 +484,13 @@ export default function VaultDashboard() {
 
   // --- UI RENDERERS ---
   
-  const updateAsset = (key, value) => setData(prev => ({ ...prev, assets: { ...prev.assets, [key]: parseInt(value) || 0 } }));
   const toggleWidgetConfig = (key) => toggleWidget(key);
   
   const renderWidget = (widgetId) => {
     const isVisible = data.widgetConfig?.[widgetId];
     if (!isVisible && !editMode) return null;
-    const commonWrapperClass = `rounded-xl border shadow-lg relative mb-6 transition-all ${editMode ? 'cursor-move border-dashed border-slate-500 hover:bg-slate-800/50' : 'bg-[#1e1e1e] border-[#404e6d]'} ${!isVisible && editMode ? 'opacity-50' : ''}`;
+    // FIX: Using flexible outer wrapper class with h-fit for content, but ensuring flex-col for internal stacking
+    const commonWrapperClass = `rounded-xl border shadow-lg relative mb-6 transition-all flex flex-col ${editMode ? 'cursor-move border-dashed border-slate-500 hover:bg-slate-800/50' : 'bg-[#1e1e1e] border-[#404e6d]'} ${!isVisible && editMode ? 'opacity-50' : ''}`;
     const toggleBtn = editMode && <button onClick={() => toggleWidgetConfig(widgetId)} className="absolute top-2 right-2 p-1 bg-black/50 rounded z-20 text-white hover:bg-black">{isVisible ? <RenderIcon name="Eye" size={14}/> : <RenderIcon name="EyeOff" size={14}/>}</button>;
     const dragHandle = editMode && <div className="absolute top-2 left-2 text-slate-500"><RenderIcon name="GripVertical" size={16}/></div>;
 
@@ -455,7 +535,13 @@ export default function VaultDashboard() {
                    <button key={tab} onClick={() => setHomeWidgetTab(tab)} className={`text-[10px] font-bold uppercase px-3 py-2 rounded transition-all whitespace-nowrap ${homeWidgetTab === tab ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`}>{tab}</button>
                 ))}
              </div>
-             {homeWidgetTab === 'skills' && <SkillMatrix skills={playerSkills} onItemClick={setSkillModal} />}
+             {homeWidgetTab === 'skills' && (
+                 <div className="grid grid-cols-2 gap-2 p-2 bg-[#131313] rounded border border-slate-800 overflow-y-auto custom-scrollbar max-h-[400px]">
+                    {playerSkills.map((skill) => (
+                        <SkillCard key={skill.id} skill={skill} onItemClick={setSkillModal} totalXP={totalXPs[skill.id]} />
+                    ))}
+                 </div>
+             )}
              {homeWidgetTab === 'inventory' && <InventoryGrid inventory={data.inventory} mp={data.discipline} onUseItem={handleUseItem} />}
              {homeWidgetTab === 'contracts' && <ContractWidget contracts={displayContracts} onToggle={toggleAchievement} title="" />}
           </div>
@@ -488,21 +574,51 @@ export default function VaultDashboard() {
       case 'player_card': return (<div className={`${commonWrapperClass} p-4 h-fit`}>{toggleBtn}{dragHandle}<div className="flex items-center gap-3 mb-4"><div className="w-12 h-12 rounded bg-slate-700 flex items-center justify-center text-2xl">🧙‍♂️</div><div><div className="font-bold text-white">Lvl {Math.floor(combatStats.totalLevel/3)} Architect</div><div className="text-xs text-amber-500 font-mono">Combat: {combatStats.combatLevel}</div></div></div><div className="text-xs text-slate-400 space-y-1"><div className="flex justify-between"><span>Total Level:</span> <span className="text-white">{combatStats.totalLevel} / {MAX_TOTAL_LEVEL}</span></div><div className="flex justify-between"><span>Contracts:</span> <span className="text-white">{data.achievements.filter(a=>a.completed).length}</span></div></div></div>);
       case 'p_vitals': return (<div className={`${commonWrapperClass} p-4 h-fit`}>{toggleBtn}{dragHandle}<h3 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2 pl-4"><RenderIcon name="Activity" size={14}/> Daily Vitals</h3><div className="space-y-4"><WellnessBar label="Energy" value={data.wellness.energy} iconName="Zap" color="bg-yellow-400" onFill={() => updateWellness('energy', 20)} task="Sleep 8h" /><WellnessBar label="Hydration" value={data.wellness.hydration} iconName="Droplet" color="bg-blue-400" onFill={() => updateWellness('hydration', 20)} task="Drink Water" /><WellnessBar label="Focus" value={data.wellness.focus} iconName="Brain" color="bg-purple-400" onFill={() => updateWellness('focus', 20)} task="Deep Work" /></div></div>);
       case 'financial_overview': return (<div className={`${commonWrapperClass} p-6 h-fit`}>{toggleBtn}{dragHandle}<h3 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2 pl-4"><RenderIcon name="Lock" size={14}/> Financial War Room</h3><div className="grid grid-cols-2 gap-4 mb-6"><div className="bg-black/20 p-3 rounded"><div className="text-[10px] text-slate-400">NET WORTH</div><div className="font-mono text-lg text-white">${financials.netWorth.toLocaleString()}</div></div><div className="bg-black/20 p-3 rounded"><div className="text-[10px] text-slate-400">RUNWAY</div><div className="font-mono text-lg text-emerald-400">{financials.runwayMonths}m</div></div></div><div className="space-y-4"><AssetBar label="Real Estate" value={data.assets.realEstate} total={financials.totalAssets} color="#10b981" /><AssetBar label="Digital IP" value={data.assets.digitalIP} total={financials.totalAssets} color="#3b82f6" /><AssetBar label="Metals" value={data.assets.metals} total={financials.totalAssets} color={colors.accentPrimary} /><AssetBar label="Crypto" value={data.assets.crypto} total={financials.totalAssets} color="#a855f7" /></div></div>);
-      case 'unified_menu': return (<div className={`${commonWrapperClass} p-6 h-fit flex flex-col`}>{toggleBtn}{dragHandle}<div className="flex space-x-2 mb-6 border-b border-slate-700 pb-2 overflow-x-auto pl-4">{['skills', 'inventory', 'mastery_log'].map(tab => ( // Added Mastery Log Button
-                   <button key={tab} onClick={() => { setProfileWidgetTab(tab); if (tab === 'mastery_log') setMasteryLogOpen(true); }} className={`px-3 py-1.5 rounded transition-all whitespace-nowrap text-[10px] font-bold uppercase ${profileWidgetTab === tab ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`}>
-                      {tab === 'mastery_log' ? 'Mastery Log' : tab}
-                   </button>
-                ))}</div><SkillMatrix skills={playerSkills} onItemClick={setSkillModal} />{homeWidgetTab === 'inventory' && <InventoryGrid inventory={data.inventory} mp={data.discipline} onUseItem={handleUseItem} />}</div>);
+      
+      // MODIFIED: Simplified unified_menu
+      case 'unified_menu': return (<div className={`${commonWrapperClass} p-6 h-fit flex flex-col`}>
+             {toggleBtn}{dragHandle}
+             <div className="flex space-x-2 mb-6 border-b border-slate-700 pb-2 overflow-x-auto pl-4">
+                {['skills', 'inventory'].map(tab => ( 
+                   <button key={tab} onClick={() => setProfileWidgetTab(tab)} className={`px-3 py-1.5 rounded transition-all whitespace-nowrap text-[10px] font-bold uppercase ${profileWidgetTab === tab ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`}>{tab}</button>
+                ))}
+             </div>
+             {profileWidgetTab === 'skills' && (
+                 <div className="grid grid-cols-2 gap-2 p-2 bg-[#131313] rounded border border-slate-800 overflow-y-auto custom-scrollbar max-h-[400px]">
+                    {playerSkills.map((skill) => (
+                        <SkillCard key={skill.id} skill={skill} onItemClick={setSkillModal} totalXP={totalXPs[skill.id]} />
+                    ))}
+                 </div>
+             )}
+             {profileWidgetTab === 'inventory' && <InventoryGrid inventory={data.inventory} mp={data.discipline} onUseItem={handleUseItem} />}
+          </div>);
+      
+      // NEW WIDGET CASE: Mastery Log Overview (Standalone Widget)
+      case 'mastery_log_widget': 
+        return (
+            // FIX: Removed h-fit from the inner commonWrapperClass block as well, letting the internal content dictate height up to max-h
+            <div className={`${commonWrapperClass} p-6 flex-1`}>
+                {toggleBtn}{dragHandle}
+                {/* FIX: Removed flex-1/min-h, allowing the component to size based on its internal max-h */}
+                <div> 
+                    <MasteryLogWidget 
+                        playerSkills={playerSkills}
+                        totalXPs={totalXPs}
+                        onItemClick={setSkillModal}
+                    />
+                </div>
+            </div>
+        );
+
       case 'active_contracts': return (<div className={`${commonWrapperClass} p-0 h-fit`}>{toggleBtn}{dragHandle}<div className="p-4"><h3 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2"><RenderIcon name="Flame" size={14}/> Active Contracts</h3><ContractWidget contracts={displayContracts} onToggle={toggleAchievement} title="" /></div></div>);
       case 'collection': return (<div className={`${commonWrapperClass} p-6 h-fit`}>{toggleBtn}{dragHandle}<CollectionBinder cards={data.cards} onSell={handleSellCard} /></div>);
       
-      // FIX: Added handler for the mastery_log_btn to render a button if added to the grid
       case 'mastery_log_btn': 
         return (
             <div className={`${commonWrapperClass} p-4 h-fit flex items-center justify-center`}>
                 {toggleBtn}{dragHandle}
                 <button onClick={() => setMasteryLogOpen(true)} className="bg-amber-500 hover:bg-amber-400 text-black font-bold py-2 px-4 rounded flex items-center gap-2">
-                    <RenderIcon name="Scroll" size={20}/> Open Mastery Log
+                    <RenderIcon name="Scroll" size={20}/> Open Global Mastery
                 </button>
             </div>
         );
@@ -512,16 +628,36 @@ export default function VaultDashboard() {
   };
 
 
-
   // --- RENDER MAIN ---
   return (
+    // FIX: Using new local storage key to force loading new config
     <div className="min-h-screen text-slate-200 font-sans selection:bg-[#e1b542] selection:text-black pb-10" style={{ backgroundColor: colors.bg }}>
       {/* Toast, Modals, Header... (Keep existing) */}
       {toast && <div className="fixed top-20 right-4 z-[100] bg-[#232a3a] border border-amber-500 text-white px-4 py-3 rounded shadow-xl"><RenderIcon name="Zap" size={16} className="text-amber-500" /> <span className="text-sm font-bold">{toast.msg}</span></div>}
       
       {/* Modals: Skill Detail and Mastery Log */}
-      {skillModal && <SkillDetailModal skill={skillModal} onClose={() => setSkillModal(null)} colors={colors} />}
-      {masteryLogOpen && <MasteryLogModal onClose={() => setMasteryLogOpen(false)} skills={playerSkills} colors={colors} />}
+      {skillModal && (
+        <MasteryModal 
+            skill={skillModal} 
+            onClose={() => setSkillModal(null)} 
+            onClaimReward={handleClaimMasteryReward}
+            claimedLevels={data.lifetime.claimedMasteryRewards[skillModal.id] || []}
+        />
+      )}
+      {masteryLogOpen && (
+        <MasteryModal 
+            skill={{
+                ...playerSkills.find(s => s.id === 'cod'), 
+                name: "All Skills Overview", 
+                icon: "LayoutDashboard", 
+                color: "text-amber-500",
+                currentXP: Object.values(totalXPs).reduce((a, b) => a + b, 0)
+            }} 
+            onClose={() => setMasteryLogOpen(false)} 
+            onClaimReward={handleClaimMasteryReward}
+            claimedLevels={[]}
+        />
+      )}
 
       {/* HEADER */}
       <header className="p-4 sticky top-0 z-50 shadow-xl" style={{ backgroundColor: colors.bg, borderBottom: `1px solid ${colors.border}` }}>
@@ -536,7 +672,7 @@ export default function VaultDashboard() {
                 <span className="text-slate-600 hidden sm:inline">|</span>
                 <span className="flex items-center gap-1 text-amber-500 font-bold"><RenderIcon name="Sword" size={12} /> {combatStats.combatLevel}</span>
                 <span className="flex items-center gap-1 text-emerald-400 font-bold"><RenderIcon name="Plus" size={12} /> {data.discipline}</span>
-                <span className="text-slate-600">|</span>
+                <span className="text-slate-600 hidden sm:inline">|</span>
                 <span className="flex items-center gap-1 text-white"><RenderIcon name="Lock" size={12} /> ${financials.netWorth.toLocaleString()}</span>
                 <span className="flex items-center gap-1 text-white"><RenderIcon name="DollarSign" size={12} /> ${data.cash.toLocaleString()}</span>
               </div>
@@ -644,9 +780,9 @@ export default function VaultDashboard() {
                 {editMode && (
                    <div className="bg-[#1e1e1e] border border-slate-700 rounded-lg p-2 flex gap-2 mr-4 items-center shadow-xl animate-in fade-in zoom-in">
                       <div className="text-xs font-bold text-slate-400 px-2 uppercase tracking-wider border-r border-slate-700 mr-1">Profile Config</div>
-                      {['player_card', 'p_vitals', 'financial_overview', 'unified_menu', 'active_contracts', 'collection', 'mastery_log_btn'].map(k => (
+                      {['player_card', 'p_vitals', 'financial_overview', 'unified_menu', 'active_contracts', 'collection', 'mastery_log_btn', 'mastery_log_widget'].map(k => (
                          <button key={k} onClick={() => toggleWidgetConfig(k)} className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${data.widgetConfig[k] ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
-                           {k === 'mastery_log_btn' ? 'Mastery Log' : k.replace(/_/g,' ')}
+                           {k === 'mastery_log_btn' ? 'Mastery Btn' : k.replace(/_/g,' ')}
                          </button>
                       ))}
                    </div>
@@ -693,8 +829,8 @@ export default function VaultDashboard() {
                      <InputField label="Digital Products/IP ($)" value={data.assets.digitalIP} onChange={(v) => updateAsset('digitalIP', v)} />
                  </InputGroup>
                  <InputGroup title="Liabilities">
-                     <InputField label="Mortgage Balance ($)" value={data.liabilities.mortgage} onChange={(v) => setData(prev => ({...prev, liabilities: {...prev.liabilities, mortgage: parseInt(v)||0}}))} />
-                     <InputField label="Consumer Debt ($)" value={data.liabilities.debt} onChange={(v) => setData(prev => ({...prev, liabilities: {...prev.liabilities, debt: parseInt(v)||0}}))} />
+                     <InputField label="Mortgage Balance ($)" value={data.liabilities.mortgage} onChange={(v) => updateLiability('mortgage', v)} />
+                     <InputField label="Consumer Debt ($)" value={data.liabilities.debt} onChange={(v) => updateLiability('debt', v)} />
                  </InputGroup>
                  <InputGroup title="Social Capital">
                     <InputField label="Total Audience Size" value={data.assets.audience} onChange={(v) => updateAsset('audience', v)} />

@@ -19,7 +19,7 @@ import {
 
 // --- CONFIGURATION ---
 export const USER_NAME = "Justin";
-export const CURRENT_VERSION = "v28.0"; // Updated for Statistics
+export const CURRENT_VERSION = "v29.0"; // Updated for Permanent XP System
 export const INVENTORY_SLOTS = 28;
 export const BANK_SLOTS = 50;
 export const MAX_SKILL_LEVEL = 99;
@@ -30,22 +30,243 @@ export const CARDS_PER_PAGE = 8;
 export const PLOT_COST = 1000;
 export const MAX_GRID_DIMENSION = 10;
 
-// --- STATIC DATA ---
-
+// --- STATIC DATA: FULL 10-TIER SKILL DETAILS ---
+// XP CALC: Level = 25 * log10((XP / 100) + 1)
 export const SKILL_DETAILS = {
-  inc: { name: "Income", icon: "Sword", desc: "Raw earning power.", unlocks: [{ level: 10, title: "Paycheck" }, { level: 50, title: "$100k Club" }, { level: 99, title: "Tycoon" }] },
-  cod: { name: "Code", icon: "Code", desc: "Coding ability.", unlocks: [{ level: 10, title: "Hello World" }, { level: 50, title: "Senior Dev" }, { level: 99, title: "Singularity" }] },
-  cnt: { name: "Content", icon: "Target", desc: "Influence.", unlocks: [{ level: 10, title: "Voice" }, { level: 50, title: "Monetized" }, { level: 99, title: "Cult Leader" }] },
-  ai: { name: "AI Ops", icon: "Sparkles", desc: "AI Ops.", unlocks: [{ level: 10, title: "Prompter" }, { level: 50, title: "Automator" }, { level: 99, title: "Necromancer" }] },
-  sec: { name: "Security", icon: "Shield", desc: "Financial Security.", unlocks: [{ level: 10, title: "Buffer" }, { level: 50, title: "Insured" }, { level: 99, title: "Immortal" }] },
-  vit: { name: "Vitality", icon: "Heart", desc: "Health.", unlocks: [{ level: 10, title: "Walker" }, { level: 50, title: "Athlete" }, { level: 99, title: "Olympian" }] },
-  wis: { name: "Wisdom", icon: "Star", desc: "Future Proofing.", unlocks: [{ level: 10, title: "Will" }, { level: 50, title: "Trust" }, { level: 99, title: "Dynasty" }] },
-  net: { name: "Network", icon: "Users", desc: "Community.", unlocks: [{ level: 10, title: "Lurker" }, { level: 50, title: "Leader" }, { level: 99, title: "The Hub" }] },
-  ast: { name: "Assets", icon: "Pickaxe", desc: "Hard Assets.", unlocks: [{ level: 10, title: "Stacker" }, { level: 50, title: "Standard" }, { level: 99, title: "Dragon" }] },
-  flo: { name: "Cash Flow", icon: "Activity", desc: "Cash Flow.", unlocks: [{ level: 10, title: "Positive" }, { level: 50, title: "Surplus" }, { level: 99, title: "Infinite" }] },
-  inv: { name: "Invest", icon: "Sprout", desc: "Growth.", unlocks: [{ level: 10, title: "Sower" }, { level: 50, title: "Compounder" }, { level: 99, title: "Harvest" }] },
-  est: { name: "Estate", icon: "Hammer", desc: "Real Estate.", unlocks: [{ level: 10, title: "Tenant" }, { level: 50, title: "Portfolio" }, { level: 99, title: "Baron" }] },
-  dis: { name: "Discipline", icon: "Flame", desc: "Willpower.", unlocks: [{ level: 10, title: "Routine" }, { level: 50, title: "Iron Will" }, { level: 99, title: "Monk Mode" }] },
+  inc: { 
+    name: "Income", 
+    icon: "Sword", 
+    color: "text-emerald-400",
+    desc: "Raw earning power and market value.", 
+    unlocks: [
+      { level: 10, title: "Paycheck", desc: "Secure a consistent income source.", reward: { name: "Ledger", type: "Item", icon: "Book" } },
+      { level: 20, title: "Side Hustle", desc: "Earn your first $100 outside of work." },
+      { level: 30, title: "Freelancer", desc: "Establish a reliable client base." },
+      { level: 40, title: "High Earner", desc: "Surpass median household income solo." },
+      { level: 50, title: "$100k Club", desc: "Break the six-figure ceiling.", reward: { name: "Gold Calculator", type: "Gear", icon: "Landmark" } },
+      { level: 60, title: "Investor", desc: "Your money makes more money than you do." },
+      { level: 70, title: "Rainmaker", desc: "Generate revenue on demand." },
+      { level: 80, title: "Whale", desc: "Net worth exceeds lifetime expenses." },
+      { level: 90, title: "Magnate", desc: "Own multiple cash-flowing assets." },
+      { level: 99, title: "Tycoon", desc: "Financial freedom is absolute.", reward: { name: "Tycoon's Scepter", type: "Trophy", icon: "Crown" } }
+    ] 
+  },
+  cod: { 
+    name: "Code", 
+    icon: "Code", 
+    color: "text-blue-400",
+    desc: "Proficiency in software architecture and syntax.", 
+    unlocks: [
+      { level: 10, title: "Hello World", desc: "Write your first functional script.", reward: { name: "Coffee Mug", type: "Consumable", icon: "Coffee" } },
+      { level: 20, title: "Script Kiddie", desc: "Automate a simple daily task." },
+      { level: 30, title: "Git Pusher", desc: "Contribute to a repository weekly." },
+      { level: 40, title: "Full Stack", desc: "Build and deploy a complete web app." },
+      { level: 50, title: "Senior Dev", desc: "Master a specific language or framework.", reward: { name: "Mechanical Keyboard", type: "Gear", icon: "Monitor" } },
+      { level: 60, title: "Architect", desc: "Design a scalable system from scratch." },
+      { level: 70, title: "Algorithmic", desc: "Solve hard LeetCode problems easily." },
+      { level: 80, title: "Maintainer", desc: "Manage a large open source project." },
+      { level: 90, title: "System Lord", desc: "Your code runs critical infrastructure." },
+      { level: 99, title: "Singularity", desc: "You speak fluent machine code.", reward: { name: "Neural Interface", type: "Trophy", icon: "Cpu" } }
+    ] 
+  },
+  cnt: { 
+    name: "Content", 
+    icon: "Target", 
+    color: "text-pink-400",
+    desc: "Influence, audience reach, and media production.", 
+    unlocks: [
+      { level: 10, title: "Lurker No More", desc: "Post your first piece of public content.", reward: { name: "Notebook", type: "Item", icon: "Edit3" } },
+      { level: 20, title: "Commenter", desc: "Engage with a community regularly." },
+      { level: 30, title: "Publisher", desc: "Stick to a weekly posting schedule." },
+      { level: 40, title: "Viral", desc: "One post exceeds 10k views/impressions." },
+      { level: 50, title: "Monetized", desc: "Earn your first dollar from content.", reward: { name: "Pro Camera", type: "Gear", icon: "Camera" } },
+      { level: 60, title: "Brand Deal", desc: "Secure a sponsorship or partnership." },
+      { level: 70, title: "Influencer", desc: "Can move markets with a mention." },
+      { level: 80, title: "Thought Leader", desc: "Others cite your work as primary source." },
+      { level: 90, title: "Media Empire", desc: "Manage a team of creators." },
+      { level: 99, title: "Cult Leader", desc: "Your audience follows you anywhere.", reward: { name: "Golden Mic", type: "Trophy", icon: "Mic" } }
+    ] 
+  },
+  ai: { 
+    name: "AI Ops", 
+    icon: "Sparkles", 
+    color: "text-purple-400",
+    desc: "Leveraging artificial intelligence for leverage.", 
+    unlocks: [
+      { level: 10, title: "User", desc: "Create an account on an LLM." },
+      { level: 20, title: "Prompter", desc: "Learn effective prompt engineering." },
+      { level: 30, title: "Tweaker", desc: "Customize system instructions." },
+      { level: 40, title: "Automator", desc: "Connect AI to an API/Webhook." },
+      { level: 50, title: "Fine-Tuner", desc: "Train a model on custom data.", reward: { name: "AI Cluster Key", type: "Gear", icon: "Server" } },
+      { level: 60, title: "Local Host", desc: "Run a model on your own hardware." },
+      { level: 70, title: "Agent Builder", desc: "Create autonomous agents." },
+      { level: 80, title: "Swarm Architect", desc: "Orchestrate multi-agent systems." },
+      { level: 90, title: "AGI Researcher", desc: "Push the boundaries of intelligence." },
+      { level: 99, title: "Necromancer", desc: "Breathe life into silicon.", reward: { name: "A.G.I. Core", type: "Trophy", icon: "Dna" } }
+    ] 
+  },
+  sec: { 
+    name: "Security", 
+    icon: "Shield", 
+    color: "text-slate-300",
+    desc: "Digital privacy, asset protection, and redundancy.", 
+    unlocks: [
+      { level: 10, title: "2FA User", desc: "Enable 2FA on all critical accounts." },
+      { level: 20, title: "Manager", desc: "Use a password manager for everything." },
+      { level: 30, title: "Encrypted", desc: "Encrypt your local hard drives." },
+      { level: 40, title: "Backup", desc: "Implement the 3-2-1 backup rule." },
+      { level: 50, title: "Insured", desc: "Full coverage for health/auto/home.", reward: { name: "Paper Wallet", type: "Item", icon: "FileKey" } },
+      { level: 60, title: "Air Gapped", desc: "Store critical keys offline." },
+      { level: 70, title: "Privacy Coin", desc: "Understand and use anonymous txs." },
+      { level: 80, title: "Offshore", desc: "Legal entity in a second jurisdiction." },
+      { level: 90, title: "Bunker", desc: "Self-sustaining physical security." },
+      { level: 99, title: "Immortal", desc: "Legacy secured for generations.", reward: { name: "Fortress Vault", type: "Trophy", icon: "Lock" } }
+    ] 
+  },
+  vit: { 
+    name: "Vitality", 
+    icon: "Heart", 
+    color: "text-red-400",
+    desc: "Physical health, endurance, and strength.", 
+    unlocks: [
+      { level: 10, title: "Walker", desc: "Hit 10k steps daily for a week." },
+      { level: 20, title: "Mover", desc: "Complete a 30-minute workout without stopping." },
+      { level: 30, title: "Hydrated", desc: "Perfect hydration streak for a month." },
+      { level: 40, title: "Lifter", desc: "Bench/Squat your bodyweight." },
+      { level: 50, title: "Athlete", desc: "Run a 5k in under 25 minutes.", reward: { name: "Gym Membership", type: "Gear", icon: "Dumbbell" } },
+      { level: 60, title: "Machine", desc: "Maintain peak heart rate for 10 mins." },
+      { level: 70, title: "Iron Body", desc: "Never get sick due to lifestyle choices." },
+      { level: 80, title: "Spartan", desc: "Complete a triathlon or marathon." },
+      { level: 90, title: "Adonis", desc: "Reach <12% body fat with high muscle mass." },
+      { level: 99, title: "Olympian", desc: "Peak human physical condition.", reward: { name: "Golden Heart", type: "Trophy", icon: "Heart" } }
+    ] 
+  },
+  wis: { 
+    name: "Wisdom", 
+    icon: "Star", 
+    color: "text-indigo-400",
+    desc: "Knowledge acquisition and application.", 
+    unlocks: [
+      { level: 10, title: "Reader", desc: "Finish one non-fiction book." },
+      { level: 20, title: "Note Taker", desc: "Maintain a personal knowledge base." },
+      { level: 30, title: "Student", desc: "Complete an online course." },
+      { level: 40, title: "Graduate", desc: "Master a complex subject." },
+      { level: 50, title: "Teacher", desc: "Successfully mentor someone else.", reward: { name: "Library Card", type: "Item", icon: "Library" } },
+      { level: 60, title: "Philosopher", desc: "Develop your own mental models." },
+      { level: 70, title: "Polymath", desc: "Expertise in three distinct fields." },
+      { level: 80, title: "Sage", desc: "Others seek you for life advice." },
+      { level: 90, title: "Oracle", desc: "Predict trends with high accuracy." },
+      { level: 99, title: "Dynasty", desc: "Your knowledge survives you.", reward: { name: "Ancient Scroll", type: "Trophy", icon: "Scroll" } }
+    ] 
+  },
+  net: { 
+    name: "Network", 
+    icon: "Users", 
+    color: "text-cyan-400",
+    desc: "Social capital and community standing.", 
+    unlocks: [
+      { level: 10, title: "Lurker", desc: "Join a professional community." },
+      { level: 20, title: "User", desc: "Participate in discussions." },
+      { level: 30, title: "Member", desc: "Become a recognized regular." },
+      { level: 40, title: "Contributor", desc: "Add value to the group freely." },
+      { level: 50, title: "Leader", desc: "Organize an event or meetup.", reward: { name: "Business Cards", type: "Item", icon: "Briefcase" } },
+      { level: 60, title: "Connector", desc: "Introduce two high-value people." },
+      { level: 70, title: "Inner Circle", desc: "Access to exclusive closed groups." },
+      { level: 80, title: "Rainmaker", desc: "Your network generates your income." },
+      { level: 90, title: "Hub", desc: "You are the center of the graph." },
+      { level: 99, title: "The Network", desc: "Six degrees of separation is now one.", reward: { name: "Golden Ring", type: "Trophy", icon: "Globe" } }
+    ] 
+  },
+  ast: { 
+    name: "Assets", 
+    icon: "Pickaxe", 
+    color: "text-yellow-500",
+    desc: "Accumulation of hard assets and commodities.", 
+    unlocks: [
+      { level: 10, title: "Saver", desc: "Save $1,000 in cash." },
+      { level: 20, title: "Coin Collector", desc: "Own your first physical silver/gold." },
+      { level: 30, title: "Stacker", desc: "Accumulate 10oz of silver equivalent." },
+      { level: 40, title: "HODLer", desc: "Hold an asset for >1 year without selling." },
+      { level: 50, title: "Standard", desc: "Assets equal 1 year of expenses.", reward: { name: "Metal Detector", type: "Gear", icon: "Pickaxe" } },
+      { level: 60, title: "Vault", desc: "Require a physical safe for storage." },
+      { level: 70, title: "Dragon", desc: "Assets equal 5 years of expenses." },
+      { level: 80, title: "Sovereign", desc: "Assets held in multiple jurisdictions." },
+      { level: 90, title: "Reserve Bank", desc: "You can loan against your own assets." },
+      { level: 99, title: "Planet", desc: "Your gravity pulls resources to you.", reward: { name: "Golden Ore", type: "Trophy", icon: "Coins" } }
+    ] 
+  },
+  flo: { 
+    name: "Cash Flow", 
+    icon: "Activity", 
+    color: "text-green-500",
+    desc: "Liquidity management and monthly surplus.", 
+    unlocks: [
+      { level: 10, title: "Negative", desc: "Track every penny spent for a month." },
+      { level: 20, title: "Breakeven", desc: "Income exactly matches expenses." },
+      { level: 30, title: "Positive", desc: "Save 10% of monthly income." },
+      { level: 40, title: "Buffer", desc: "One month of expenses in checking." },
+      { level: 50, title: "Surplus", desc: "Save 30% of monthly income.", reward: { name: "Flow Meter", type: "Gear", icon: "Activity" } },
+      { level: 60, title: "Automated", desc: "All bills paid automatically." },
+      { level: 70, title: "Abundance", desc: "Save 50% of monthly income." },
+      { level: 80, title: "Infinite", desc: "Passive income covers basic needs." },
+      { level: 90, title: "Overflow", desc: "Passive income covers all wants." },
+      { level: 99, title: "River", desc: "Money flows in faster than you can spend.", reward: { name: "Eternal Droplet", type: "Trophy", icon: "Droplet" } }
+    ] 
+  },
+  inv: { 
+    name: "Invest", 
+    icon: "Sprout", 
+    color: "text-lime-400",
+    desc: "Capital allocation and ROI.", 
+    unlocks: [
+      { level: 10, title: "Gambler", desc: "Buy your first stock/crypto." },
+      { level: 20, title: "Speculator", desc: "Read a company balance sheet." },
+      { level: 30, title: "Sower", desc: "Set up a recurring monthly buy." },
+      { level: 40, title: "Holder", desc: "Don't panic sell during a dip." },
+      { level: 50, title: "Compounder", desc: "Reinvest dividends/yields.", reward: { name: "Growth Seed", type: "Item", icon: "Sprout" } },
+      { level: 60, title: "Diversified", desc: "Portfolio across 3 asset classes." },
+      { level: 70, title: "Accredited", desc: "Qualify for private deal flow." },
+      { level: 80, title: "VC", desc: "Invest in a private startup." },
+      { level: 90, title: "Whale", desc: "Your buy/sell moves the local price." },
+      { level: 99, title: "Market Maker", desc: "You provide the liquidity.", reward: { name: "Golden Hand", type: "Trophy", icon: "TrendingUp" } }
+    ] 
+  },
+  est: { 
+    name: "Estate", 
+    icon: "Hammer", 
+    color: "text-orange-400",
+    desc: "Real estate and physical property management.", 
+    unlocks: [
+      { level: 10, title: "Tenant", desc: "Pay rent on time for a year." },
+      { level: 20, title: "Roommate", desc: "Sublet or hack your housing costs." },
+      { level: 30, title: "Owner", desc: "Own your primary residence." },
+      { level: 40, title: "Landlord", desc: "Rent out a unit or property." },
+      { level: 50, title: "Portfolio", desc: "Own 2+ properties.", reward: { name: "Master Key", type: "Item", icon: "Key" } },
+      { level: 60, title: "Multi-Family", desc: "Own a building with 4+ units." },
+      { level: 70, title: "Commercial", desc: "Own office or retail space." },
+      { level: 80, title: "Developer", desc: "Build on raw land." },
+      { level: 90, title: "Mogul", desc: "Own a city block." },
+      { level: 99, title: "Baron", desc: "Your estate is its own zip code.", reward: { name: "Golden Deed", type: "Trophy", icon: "Map" } }
+    ] 
+  },
+  dis: { 
+    name: "Discipline", 
+    icon: "Flame", 
+    color: "text-amber-500",
+    desc: "Willpower, habits, and self-control.", 
+    unlocks: [
+      { level: 10, title: "Impulse", desc: "Resist a major temptation once." },
+      { level: 20, title: "Routine", desc: "Stick to a morning routine for a week." },
+      { level: 30, title: "Habit", desc: "Do something hard for 30 days straight." },
+      { level: 40, title: "Streak", desc: "Maintain a 100-day streak." },
+      { level: 50, title: "Iron Will", desc: "Fast for 24 hours.", reward: { name: "Focus Potion", type: "Consumable", icon: "Brain" } },
+      { level: 60, title: "Flow State", desc: "Work for 4 hours without distraction." },
+      { level: 70, title: "Monk Mode", desc: "Cut all cheap dopamine for a month." },
+      { level: 80, title: "Stoic", desc: "Remain calm in a major crisis." },
+      { level: 90, title: "Unbreakable", desc: "Your word is absolute law." },
+      { level: 99, title: "Ascended", desc: "Complete mastery over self.", reward: { name: "Eternal Flame", type: "Trophy", icon: "Flame" } }
+    ] 
+  },
 };
 
 export const CARD_DATABASE = [
@@ -139,6 +360,16 @@ export const initialData = {
   liabilities: { debt: 2000, mortgage: 0 },
   wellness: { energy: 80, hydration: 60, focus: 45 },
   
+  // NEW PERMANENT STATE FIELDS (v29.0)
+  lifetime: {
+    totalIncomeBase: 4500 * 12, 
+    totalDebtPrincipalPaid: 0,
+    totalAssetAcquisitionCost: 0,
+    peakCashFlow: (4500 - 3200) * 20,
+    // NEW: Field to track claimed mastery rewards
+    claimedMasteryRewards: {} // Format: { skillId: [level1, level2, ...], ... }
+  },
+
   // NEW: Centralized Statistics Tracking
   statistics: {
     sessionsOpened: 0,
@@ -208,19 +439,23 @@ export const initialData = {
     { id: 'q21', title: "1000lb Club", desc: "Squat/Bench/Deadlift 1000lbs total.", xp: 10000, category: "Vitality", completed: false, difficulty: "Hard" },
     { id: 'q22', title: "Angel Investor", desc: "Invest in a startup.", xp: 12000, category: "Invest", completed: false, difficulty: "Hard" }
   ],
+  // UPDATED: Make both new widgets visible by default
   widgetConfig: { 
     welcome: true, contract: true, skills: true, vitals: true, shop: true, grind: true,
     player_card: true, p_vitals: true, financial_overview: true, unified_menu: true, active_contracts: true, collection: true,
-    asset_wallet: true
+    asset_wallet: true, 
+    mastery_log_widget: true, // Force standalone widget visible
+    mastery_log_btn: true // Force button widget visible
   },
   layout: {
     home: {
         left: ['daily_ops', 'contract'], 
         right: ['shop', 'skills'] 
     },
+    // UPDATED: Add mastery_log_widget to a column for initial display
     profile: {
         left: ['player_card', 'p_vitals'],
-        center: ['financial_overview', 'unified_menu'],
+        center: ['financial_overview', 'unified_menu', 'mastery_log_widget', 'mastery_log_btn'], // Added both new widgets
         right: ['active_contracts', 'collection']
     },
     vault: {
