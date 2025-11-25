@@ -1,20 +1,21 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useGameStore } from '../../store/gamestore'; // <-- NEW IMPORT
 
 // 1. Data Import
 import { 
-  initialData, SHOP_ITEMS, CARD_DATABASE, SKILL_DETAILS, 
-  INVENTORY_SLOTS, BANK_SLOTS, USER_NAME, MAX_TOTAL_LEVEL 
+  SHOP_ITEMS, CARD_DATABASE, SKILL_DETAILS, 
+  INVENTORY_SLOTS, USER_NAME, MAX_TOTAL_LEVEL 
 } from '../../data/gamedata'; 
 
 // 2. UI Components Import
 import { 
   WellnessBar, InventoryGrid, ContractWidget, CollectionBinder, 
-  SkillMatrix, AssetBar, InputGroup, InputField, SkillCard, 
-  MasteryModal, SkillDetailModal, MasteryLogWidget 
-} from './dashboardui';
+  SkillCard, MasteryModal, MasteryLogWidget, AssetBar, 
+  InputGroup, InputField, SkillDetailModal
+} from '../../components/dashboard/dashboardui'; 
 
 // 3. Utils Import
-import { RenderIcon, getRarityColor, getRarityGradient, IconMap } from './dashboardutils';
+import { RenderIcon, IconMap } from './dashboardutils';
 
 // 4. Feature Imports
 import InventoryView from './inventoryprototype'; 
@@ -23,54 +24,52 @@ import ShopFullPage from './shopfullpage';
 import EstatePrototype from './estateprototype'; 
 
 export default function VaultDashboard() {
-  // --- STATE INITIALIZATION ---
-  const [data, setData] = useState(() => {
-    try {
-      const saved = localStorage.getItem('vault_data_v29.1'); 
-      const loaded = saved ? JSON.parse(saved) : initialData;
-      
-      const safe = { 
-          ...initialData, 
-          ...loaded,
-          statistics: { ...initialData.statistics, ...(loaded.statistics || {}) },
-          bonusXP: { ...initialData.bonusXP, ...(loaded.bonusXP || {}) },
-          wellness: { ...initialData.wellness, ...(loaded.wellness || {}) },
-          assets: { ...initialData.assets, ...(loaded.assets || {}) },
-          liabilities: { ...initialData.liabilities, ...(loaded.liabilities || {}) },
-          inventory: Array.isArray(loaded.inventory) ? loaded.inventory : initialData.inventory,
-          bank: Array.isArray(loaded.bank) ? loaded.bank : initialData.bank,
-          achievements: Array.isArray(loaded.achievements) ? loaded.achievements : initialData.achievements,
-          lifetime: { ...initialData.lifetime, ...(loaded.lifetime || {}) }
-      };
-
-      if (!safe.lifetime.claimedMasteryRewards) safe.lifetime.claimedMasteryRewards = initialData.lifetime.claimedMasteryRewards;
-
-      if (safe.inventory.length !== INVENTORY_SLOTS) {
-         const fixed = new Array(INVENTORY_SLOTS).fill(null);
-         safe.inventory.forEach((item, i) => { if(i<INVENTORY_SLOTS) fixed[i] = item });
-         safe.inventory = fixed;
-      }
-
-      return safe;
-    } catch (e) {
-      return initialData;
-    }
-  });
   
-  // Increment Session Count on Mount
-  useEffect(() => {
-      setData(prev => ({
-          ...prev,
-          statistics: { ...prev.statistics, sessionsOpened: (prev.statistics?.sessionsOpened || 0) + 1 }
-      }));
-  }, []);
+  // --- STATE CONNECTION (Replaces all internal state logic) ---
+  const { 
+    data, 
+    loading, 
+    loadGame, 
+    saveGame, 
+    updateWellness, // Use specific action
+    setDiscipline, // Use specific action
+    updateNestedData // Generic action for inputs
+  } = useGameStore();
 
-  // UI State
+  // --- LIFECYCLE HOOKS ---
+  
+  // 1. Load Data and Auto-Save Timer
+  useEffect(() => {
+      // Set the temporary user ID (will be replaced by Auth later)
+      // NOTE: In a real app, loadGame would be called after successful Firebase Auth
+      loadGame(); 
+
+      // Auto-save every 60 seconds (replaces localStorage setItem)
+      const saveInterval = setInterval(() => {
+          saveGame();
+      }, 60000); 
+
+      return () => clearInterval(saveInterval);
+  }, []); // Run only on mount
+
+  // 2. Vital Decay Loop
+  useEffect(() => {
+    if (loading) return; // Wait until data is loaded
+    
+    const timer = setInterval(() => {
+        // Use the store action to update wellness (this replaces prev => ({ ... }))
+        updateWellness('energy', -1);
+        updateWellness('hydration', -1);
+        updateWellness('focus', -1);
+    }, 30000); 
+    return () => clearInterval(timer);
+  }, [loading, updateWellness]); // Dependency on loading state
+
+  // --- UI State (Local, stays here) ---
   const [activeTab, setActiveTab] = useState('dynamic'); 
   const [homeWidgetTab, setHomeWidgetTab] = useState('skills'); 
   const [profileWidgetTab, setProfileWidgetTab] = useState('skills'); 
   const [dailyOpsTab, setDailyOpsTab] = useState('vitals'); 
-  const [shopTab, setShopTab] = useState('boosters');
   const [miniShopTab, setMiniShopTab] = useState('boosters'); 
   const [questFilter, setQuestFilter] = useState('active'); 
   const [rewardModal, setRewardModal] = useState(null); 
@@ -83,40 +82,29 @@ export default function VaultDashboard() {
 
   const colors = { bg: "#2b3446", border: "#404e6d", accentSecondary: "#78643e", accentPrimary: "#e1b542" };
 
-  useEffect(() => {
-    localStorage.setItem('vault_data_v29.1', JSON.stringify(data));
-  }, [data]);
 
-  // --- VITAL DECAY LOOP ---
-  useEffect(() => {
-    const timer = setInterval(() => {
-        setData(prev => ({
-            ...prev,
-            wellness: {
-                energy: Math.max(0, prev.wellness.energy - 1),
-                hydration: Math.max(0, prev.wellness.hydration - 1),
-                focus: Math.max(0, prev.wellness.focus - 1)
-            }
-        }));
-    }, 30000); 
-    return () => clearInterval(timer);
-  }, []);
-
-  // --- HELPERS ---
+  // --- HELPERS (Now use store actions directly) ---
   const showToast = useCallback((msg, type = 'info') => { 
       setToast({ msg, type }); 
       setTimeout(() => setToast(null), 3000); 
   }, []);
 
   const handleSetDiscipline = (valOrFn) => {
-    setData(prev => {
-      const newVal = typeof valOrFn === 'function' ? valOrFn(prev.discipline) : valOrFn;
-      return { ...prev, discipline: newVal };
-    });
+    // Uses the store action
+    setDiscipline(valOrFn);
   };
-
+  
+  // NOTE: All other complex data update handlers (like manualGrind, toggleAchievement, etc.) 
+  // currently still live inside this component and call local logic to simulate the flow. 
+  // The next phase will be to move these functions into the useGameStore file.
+  // For now, we will use a generic updateData function until those functions are migrated.
+  
+  const updateData = (updater) => {
+    useGameStore.getState().updateData(updater);
+  };
+  
   const toggleWidget = (key) => {
-    setData(prev => ({ 
+    updateData(prev => ({ 
         ...prev,
         widgetConfig: { 
             ...prev.widgetConfig,
@@ -144,7 +132,7 @@ export default function VaultDashboard() {
 
     if (!widgetId || !data.layout[targetTab]) return;
 
-    setData(prev => {
+    updateData(prev => {
         const newLayout = JSON.parse(JSON.stringify(prev.layout)); 
         const sourceList = newLayout[sourceTab][sourceColumn];
         const filteredSource = sourceList.filter(id => id !== widgetId);
@@ -157,7 +145,7 @@ export default function VaultDashboard() {
             targetList.splice(targetIndex, 0, widgetId);
         }
 
-        return { ...prev, layout: newLayout };
+        return { layout: newLayout };
     });
     setDragItem(null);
   };
@@ -199,33 +187,15 @@ export default function VaultDashboard() {
       return newCards;
   };
 
-  const updateWellness = (type, amount) => {
-    const now = new Date().toDateString();
-    setData(prev => {
-        const newStats = { ...prev.statistics };
-        if (amount > 0) {
-            if (!newStats.maintenance) newStats.maintenance = { energy: 0, hydration: 0, focus: 0 };
-            newStats.maintenance[type] = (newStats.maintenance[type] || 0) + 1;
-        }
-
-        return {
-            ...prev,
-            statistics: newStats,
-            wellness: { ...prev.wellness, [type]: Math.min(100, Math.max(0, prev.wellness[type] + amount)) },
-            discipline: prev.discipline + (amount > 0 ? 5 : 0),
-            lastMaintenance: now
-        };
-    });
-    if (amount > 0) showToast(`+5 DSC | Tracked: ${type}`, 'success');
-  };
+  // NOTE: updateWellness now comes directly from the store, simplifying this logic block.
+  // const updateWellness = (type, amount) => { ... } // REMOVED
 
   const manualGrind = (skillKey, mpReward, energyCost) => {
     if (data.wellness.energy >= energyCost) {
-      setData(prev => {
+      updateData(prev => {
         const newIncomeBase = (skillKey === 'inc') ? prev.lifetime.totalIncomeBase + (mpReward * 12) : prev.lifetime.totalIncomeBase;
         
         return ({
-          ...prev,
           wellness: { ...prev.wellness, energy: prev.wellness.energy - energyCost },
           bonusXP: { ...prev.bonusXP, [skillKey]: (prev.bonusXP?.[skillKey] || 0) + 10 },
           discipline: prev.discipline + mpReward,
@@ -252,15 +222,14 @@ export default function VaultDashboard() {
               const nextSlots = addToSlotArray(updatedSlots, pack, 1);
               if(nextSlots) updatedSlots = nextSlots;
           }
-          setData(prev => ({ ...prev, inventory: updatedSlots }));
+          updateData(prev => ({ inventory: updatedSlots }));
           showToast("Box Opened! 5 Packs added.");
 
       } else if (item.type === 'Pack') {
           const newSlots = [...data.inventory];
           if (newSlots[index].count > 1) newSlots[index].count--; else newSlots[index] = null;
           const newCards = generatePackCards(item.rarity);
-          setData(prev => ({
-              ...prev,
+          updateData(prev => ({
               statistics: incrementPackStat(prev),
               inventory: newSlots,
               cards: [...prev.cards, ...newCards.map(c => c.id)]
@@ -276,22 +245,13 @@ export default function VaultDashboard() {
       if (category === 'gear' || category === 'packs') {
           const updatedInv = addToSlotArray(data.inventory, item, 1);
           if (!updatedInv) { showToast("Inventory Full!", 'error'); return; }
-          
-          // Check for Estate Deed unlock
-          let newInventory = updatedInv;
-          if (item.id === 'g1') {
-             showToast(`Estate Unlocked! Find your new Deed in Inventory.`, 'success');
-          }
-
-          setData(prev => ({ 
-              ...prev, 
+          updateData(prev => ({ 
               statistics: incrementBought(prev),
               discipline: prev.discipline - item.cost, 
-              inventory: newInventory 
+              inventory: updatedInv 
           }));
       } else {
-          setData(prev => ({
-              ...prev, 
+          updateData(prev => ({
               statistics: incrementBought(prev),
               discipline: prev.discipline - item.cost,
               bonusXP: { ...prev.bonusXP, [item.skillId]: (prev.bonusXP?.[item.skillId] || 0) + item.xpAmount }
@@ -306,8 +266,7 @@ export default function VaultDashboard() {
       if (index > -1) {
           const newCards = [...data.cards];
           newCards.splice(index, 1); 
-          setData(prev => ({
-              ...prev,
+          updateData(prev => ({
               statistics: { 
                   ...prev.statistics, 
                   cardsSold: (prev.statistics.cardsSold || 0) + 1,
@@ -334,10 +293,10 @@ export default function VaultDashboard() {
         else { showToast("Inventory full! Reward discarded.", "error"); }
     }
 
-    setData(prev => {
+    updateData(prev => {
         const newStats = { ...prev.statistics };
         if (isCompleting) newStats.contractsCompleted = (newStats.contractsCompleted || 0) + 1;
-        return { ...prev, statistics: newStats, inventory: newInventory, achievements: prev.achievements.map(a => a.id === id ? { ...a, completed: !a.completed } : a) };
+        return { statistics: newStats, inventory: newInventory, achievements: prev.achievements.map(a => a.id === id ? { ...a, completed: !a.completed } : a) };
     });
 
     if (isCompleting) { showToast(`Completed: ${achievement.title}${rewardMsg}`, 'success'); }
@@ -345,7 +304,6 @@ export default function VaultDashboard() {
   
   const handleClaimMasteryReward = (skillId, level, reward) => {
       let newInventory = [...data.inventory];
-      let newBonusXP = { ...data.bonusXP };
       let newDiscipline = data.discipline;
 
       if (reward.type === 'Item' || reward.type === 'Gear' || reward.type === 'Trophy' || reward.type === 'Consumable') {
@@ -356,11 +314,9 @@ export default function VaultDashboard() {
           newDiscipline += reward.amount;
       }
 
-      setData(prev => ({
-          ...prev,
+      updateData(prev => ({
           discipline: newDiscipline,
           inventory: newInventory,
-          bonusXP: newBonusXP,
           lifetime: {
               ...prev.lifetime,
               claimedMasteryRewards: {
@@ -384,40 +340,44 @@ export default function VaultDashboard() {
 
   const updateAsset = (key, value) => {
     const newValue = parseInt(value) || 0;
-    setData(prev => {
-      const oldValue = prev.assets[key] || 0;
-      let costIncrease = 0;
-      
-      if (newValue > oldValue) {
-          costIncrease = newValue - oldValue;
-      }
-      
-      return { 
-          ...prev, 
-          assets: { ...prev.assets, [key]: newValue },
-          lifetime: {
-              ...prev.lifetime,
-              totalAssetAcquisitionCost: prev.lifetime.totalAssetAcquisitionCost + costIncrease 
-          }
-      };
-    });
+    const path = `assets.${key}`;
+    const oldValue = data.assets[key] || 0;
+    let costIncrease = 0;
+    
+    if (newValue > oldValue) {
+        costIncrease = newValue - oldValue;
+    }
+    
+    // Use the generic store update action
+    useGameStore.getState().updateNestedData(path, newValue);
+    
+    if (costIncrease > 0) {
+        updateData(prev => ({
+            lifetime: {
+                ...prev.lifetime,
+                totalAssetAcquisitionCost: prev.lifetime.totalAssetAcquisitionCost + costIncrease
+            }
+        }));
+    }
   };
 
   const updateLiability = (key, value) => {
     const newValue = parseInt(value) || 0;
-    setData(prev => {
-        const oldValue = prev.liabilities[key] || 0;
-        const debtPaid = Math.max(0, oldValue - newValue);
+    const path = `liabilities.${key}`;
+    const oldValue = data.liabilities[key] || 0;
+    const debtPaid = Math.max(0, oldValue - newValue);
+    
+    // Use the generic store update action
+    useGameStore.getState().updateNestedData(path, newValue);
 
-        return {
-            ...prev,
-            liabilities: { ...prev.liabilities, [key]: newValue },
+    if (debtPaid > 0) {
+        updateData(prev => ({
             lifetime: {
                 ...prev.lifetime,
                 totalDebtPrincipalPaid: prev.lifetime.totalDebtPrincipalPaid + debtPaid
             }
-        };
-    });
+        }));
+    }
   };
 
 
@@ -446,8 +406,7 @@ export default function VaultDashboard() {
     const aiXP = getXP(40000, 'ai');
 
     if (updatedPeakFlow > data.lifetime.peakCashFlow) {
-        setData(prev => ({ 
-            ...prev, 
+        updateData(prev => ({ 
             lifetime: { ...prev.lifetime, peakCashFlow: updatedPeakFlow } 
         }));
     }
@@ -477,7 +436,7 @@ export default function VaultDashboard() {
   }, [playerSkills]);
   
   const activeContracts = (data.achievements || []).filter(a => !a.completed);
-  const completedContracts = (data.achievements || []).filter(a => !a.completed);
+  const completedContracts = (data.achievements || []).filter(a => a.completed);
   const sortedActive = [...activeContracts].sort((a,b) => a.xp - b.xp); 
   const priorityContract = sortedActive[0] || { title: "All Complete", desc: "You are a legend.", xp: 0 };
   const displayContracts = questFilter === 'active' ? sortedActive : 
@@ -489,6 +448,18 @@ export default function VaultDashboard() {
   
   const toggleWidgetConfig = (key) => toggleWidget(key);
   
+  // NOTE: If loading, display spinner instead of dashboard
+  if (loading) {
+      return (
+          <div className="min-h-screen bg-[#2b3446] flex items-center justify-center">
+              <div className="flex flex-col items-center text-white">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div>
+                  <p className="mt-4 text-lg">Accessing The Vault...</p>
+              </div>
+          </div>
+      );
+  }
+
   const renderWidget = (widgetId) => {
     const isVisible = data.widgetConfig?.[widgetId];
     if (!isVisible && !editMode) return null;
@@ -508,7 +479,11 @@ export default function VaultDashboard() {
                 </div>
                 <div className="text-[10px] text-amber-500 font-mono flex items-center gap-1"><RenderIcon name="Flame" size={12}/> Streak: {data.streak}</div>
              </div>
-             {dailyOpsTab === 'vitals' && <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in"><WellnessBar label="Energy" value={data.wellness.energy} iconName="Zap" color="bg-yellow-400" onFill={() => updateWellness('energy', 20)} task="Sleep 8h" /><WellnessBar label="Hydration" value={data.wellness.hydration} iconName="Droplet" color="bg-blue-400" onFill={() => updateWellness('hydration', 20)} task="Drink Water" /><WellnessBar label="Focus" value={data.wellness.focus} iconName="Brain" color="bg-purple-400" onFill={() => updateWellness('focus', 20)} task="Deep Work" /></div>}
+             {dailyOpsTab === 'vitals' && <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in">
+                <WellnessBar label="Energy" value={data.wellness.energy} iconName="Zap" color="bg-yellow-400" onFill={() => updateWellness('energy', 20)} task="Sleep 8h" />
+                <WellnessBar label="Hydration" value={data.wellness.hydration} iconName="Droplet" color="bg-blue-400" onFill={() => updateWellness('hydration', 20)} task="Drink Water" />
+                <WellnessBar label="Focus" value={data.wellness.focus} iconName="Brain" color="bg-purple-400" onFill={() => updateWellness('focus', 20)} task="Deep Work" />
+             </div>}
              {dailyOpsTab === 'grind' && <div className="grid grid-cols-4 gap-2 animate-in fade-in">{[{k:'cod',l:'Write Code',c:'text-blue-400',i:"Code",e:5,r:10},{k:'net',l:'Network',c:'text-purple-400',i:"Users",e:5,r:10},{k:'cnt',l:'Post Content',c:'text-amber-400',i:"Target",e:5,r:10},{k:'inc',l:'Freelance',c:'text-emerald-400',i:"DollarSign",e:10,r:10}].map((g,i)=><button key={i} onClick={() => manualGrind(g.k, g.r, g.e)} className="p-3 bg-[#2a2a2a] hover:bg-[#333] rounded border border-slate-700 flex flex-col items-center justify-center gap-1 transition-all active:scale-95"><RenderIcon name={g.i} size={20} className={g.c}/><span className="text-[10px] font-bold text-slate-300">{g.l}</span><span className="text-[9px] text-slate-500">-{g.e} NRG</span></button>)}</div>}
           </div>
         );
@@ -550,9 +525,25 @@ export default function VaultDashboard() {
         );
       case 'shop':
         return (
-          <div className={`${commonWrapperClass} p-0 overflow-hidden bg-[#1e1e1e]`}>
+          <div className={`${commonWrapperClass} p-4 h-fit`}>
              {toggleBtn}{dragHandle}
-             <ShopFullPage onPurchase={purchaseItem} discipline={data.discipline} />
+             <div className="flex justify-between items-center mb-4 pl-4">
+                 <h3 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2"><RenderIcon name="ShoppingBag" size={14}/> Black Market</h3>
+                 <div className="flex gap-1">
+                    {['boosters', 'gear', 'packs'].map(tab => (
+                        <button key={tab} onClick={() => setMiniShopTab(tab)} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${miniShopTab === tab ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white'}`}>{tab}</button>
+                    ))}
+                 </div>
+             </div>
+             <div className="space-y-2 pr-1">
+                 {SHOP_ITEMS[miniShopTab].slice(0,3).map(item => (
+                    <div key={item.id} className="flex items-center justify-between p-3 rounded bg-[#2a2a2a] border border-[#333] group hover:border-amber-500 transition-colors">
+                       <div className="flex items-center gap-3"><span className={`${item.color}`}><RenderIcon name={item.iconName} /></span><div><div className="text-xs font-bold text-slate-200">{item.name}</div><div className="text-[9px] text-slate-500">{item.effect}</div></div></div>
+                       <button onClick={() => purchaseItem(item, miniShopTab)} className="px-2 py-1 bg-emerald-900/30 text-emerald-400 text-[10px] rounded border border-emerald-800 hover:bg-emerald-500 hover:text-black transition-colors whitespace-nowrap">{item.cost} DSC</button>
+                    </div>
+                 ))}
+                 <button onClick={() => setActiveTab('shop')} className="w-full py-2 text-xs text-slate-500 hover:text-white mt-2 border-t border-slate-700">VIEW FULL MARKET</button>
+             </div>
           </div>
         );
       case 'welcome': return null; 
@@ -561,6 +552,7 @@ export default function VaultDashboard() {
       case 'p_vitals': return (<div className={`${commonWrapperClass} p-4 h-fit`}>{toggleBtn}{dragHandle}<h3 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2 pl-4"><RenderIcon name="Activity" size={14}/> Daily Vitals</h3><div className="space-y-4"><WellnessBar label="Energy" value={data.wellness.energy} iconName="Zap" color="bg-yellow-400" onFill={() => updateWellness('energy', 20)} task="Sleep 8h" /><WellnessBar label="Hydration" value={data.wellness.hydration} iconName="Droplet" color="bg-blue-400" onFill={() => updateWellness('hydration', 20)} task="Drink Water" /><WellnessBar label="Focus" value={data.wellness.focus} iconName="Brain" color="bg-purple-400" onFill={() => updateWellness('focus', 20)} task="Deep Work" /></div></div>);
       case 'financial_overview': return (<div className={`${commonWrapperClass} p-6 h-fit`}>{toggleBtn}{dragHandle}<h3 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2 pl-4"><RenderIcon name="Lock" size={14}/> Financial War Room</h3><div className="grid grid-cols-2 gap-4 mb-6"><div className="bg-black/20 p-3 rounded"><div className="text-[10px] text-slate-400">NET WORTH</div><div className="font-mono text-lg text-white">${financials.netWorth.toLocaleString()}</div></div><div className="bg-black/20 p-3 rounded"><div className="text-[10px] text-slate-400">RUNWAY</div><div className="font-mono text-lg text-emerald-400">{financials.runwayMonths}m</div></div></div><div className="space-y-4"><AssetBar label="Real Estate" value={data.assets.realEstate} total={financials.totalAssets} color="#10b981" /><AssetBar label="Digital IP" value={data.assets.digitalIP} total={financials.totalAssets} color="#3b82f6" /><AssetBar label="Metals" value={data.assets.metals} total={financials.totalAssets} color={colors.accentPrimary} /><AssetBar label="Crypto" value={data.assets.crypto} total={financials.totalAssets} color="#a855f7" /></div></div>);
       
+      // MODIFIED: Simplified unified_menu
       case 'unified_menu': return (<div className={`${commonWrapperClass} p-6 h-fit flex flex-col`}>
              {toggleBtn}{dragHandle}
              <div className="flex space-x-2 mb-6 border-b border-slate-700 pb-2 overflow-x-auto pl-4">
@@ -578,11 +570,12 @@ export default function VaultDashboard() {
              {profileWidgetTab === 'inventory' && <InventoryGrid inventory={data.inventory} mp={data.discipline} onUseItem={handleUseItem} />}
           </div>);
       
+      // NEW WIDGET CASE: Mastery Log Overview (Standalone Widget)
       case 'mastery_log_widget': 
         return (
             <div className={`${commonWrapperClass} p-6 flex-1`}>
                 {toggleBtn}{dragHandle}
-                <div className="flex-1 min-h-[300px]">
+                <div> 
                     <MasteryLogWidget 
                         playerSkills={playerSkills}
                         totalXPs={totalXPs}
@@ -609,13 +602,14 @@ export default function VaultDashboard() {
     }
   };
 
-  const hasEstateDeed = data.inventory.some(item => item && item.id === 'g1');
 
+  // --- RENDER MAIN ---
   return (
     <div className="min-h-screen text-slate-200 font-sans selection:bg-[#e1b542] selection:text-black pb-10" style={{ backgroundColor: colors.bg }}>
-      {/* Toast, Modals... */}
+      {/* Toast, Modals, Header... (Keep existing) */}
       {toast && <div className="fixed top-20 right-4 z-[100] bg-[#232a3a] border border-amber-500 text-white px-4 py-3 rounded shadow-xl"><RenderIcon name="Zap" size={16} className="text-amber-500" /> <span className="text-sm font-bold">{toast.msg}</span></div>}
       
+      {/* Modals: Skill Detail and Mastery Log */}
       {skillModal && (
         <MasteryModal 
             skill={skillModal} 
@@ -667,19 +661,11 @@ export default function VaultDashboard() {
               { id: 'shop', icon: "ShoppingBag", label: 'SHOP' }, 
               { id: 'inventory', icon: "Package", label: 'INVENTORY' },
               { id: 'stats', icon: "Activity", label: 'STATS' }, 
-              { id: 'estate', icon: "Home", label: 'ESTATE', restricted: !hasEstateDeed }, // Apply restriction here
+              { id: 'estate', icon: "Home", label: 'ESTATE' }, 
               { id: 'inputs', icon: "Code", label: 'INPUTS' } 
             ].map((tab) => (
-              <button 
-                key={tab.id} 
-                onClick={() => !tab.restricted && setActiveTab(tab.id)} 
-                disabled={tab.restricted}
-                className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-2 ${tab.restricted ? 'opacity-50 cursor-not-allowed text-slate-600' : ''}`}
-                style={{ backgroundColor: activeTab === tab.id ? colors.accentPrimary : 'transparent', color: activeTab === tab.id ? '#000' : '#94a3b8' }}
-              >
-                {tab.restricted && <RenderIcon name="Lock" size={16} />}
-                {!tab.restricted && <RenderIcon name={tab.icon} size={16} />}
-                 <span className="hidden md:inline">{tab.label}</span>
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-2" style={{ backgroundColor: activeTab === tab.id ? colors.accentPrimary : 'transparent', color: activeTab === tab.id ? '#000' : '#94a3b8' }}>
+                <RenderIcon name={tab.icon} size={16} /> <span className="hidden md:inline">{tab.label}</span>
               </button>
             ))}
           </nav>
@@ -688,7 +674,7 @@ export default function VaultDashboard() {
 
       <main className="max-w-6xl mx-auto p-4 md:p-8 relative">
          
-         {/* FIX: Ensure Home rendering only occurs when 'dynamic' is active */}
+         {/* DYNAMIC TAB (Home) */}
          {activeTab === 'dynamic' && (
              <div className="animate-in fade-in duration-500">
                 <div className="flex justify-end mb-4">
@@ -720,29 +706,23 @@ export default function VaultDashboard() {
                  </div>
              </div>
          )}
-         
-         {activeTab === 'estate' && (
-            <div className="animate-in fade-in duration-500 h-[calc(100vh-140px)]">
-                {hasEstateDeed ? (
-                    <EstatePrototype 
-                        discipline={data.discipline} 
-                        setDiscipline={(valOrFn) => handleSetDiscipline(valOrFn)} 
-                    />
-                ) : (
-                    <div className="h-full flex flex-col items-center justify-center bg-[#1e1e1e] border border-slate-700 rounded-xl p-10 text-center">
-                        <RenderIcon name="Lock" size={48} className="text-amber-500 mb-4"/>
-                        <h2 className="text-2xl font-bold text-white mb-2">Estate Locked</h2>
-                        <p className="text-slate-400 max-w-md">Purchase the **Estate Deed** from the Black Market's **Equipment** section to unlock your property and begin construction.</p>
-                        <button onClick={() => setActiveTab('shop')} className="mt-6 px-6 py-2 bg-amber-500 text-black font-bold rounded-lg hover:bg-amber-400">Go to Market</button>
-                    </div>
-                )}
-            </div>
-         )}
-         
+
+         {/* STATS TAB */}
          {activeTab === 'stats' && (
              <StatisticsTab stats={data.statistics} />
          )}
 
+         {/* ESTATE TAB */}
+         {activeTab === 'estate' && (
+            <div className="animate-in fade-in duration-500 h-[calc(100vh-140px)]">
+                <EstatePrototype 
+                  discipline={data.discipline} 
+                  setDiscipline={(valOrFn) => handleSetDiscipline(valOrFn)} 
+                />
+            </div>
+         )}
+
+         {/* INVENTORY TAB */}
          {activeTab === 'inventory' && (
             <div className="animate-in fade-in duration-500 h-[calc(100vh-140px)]">
                 <InventoryView 
@@ -751,21 +731,23 @@ export default function VaultDashboard() {
                     bankBalance={data.bankBalance}
                     cards={data.cards} 
                     discipline={data.discipline} 
-                    onUpdateInventory={(inv) => setData(p => ({...p, inventory: inv}))}
-                    onUpdateBank={(bank) => setData(p => ({...p, bank}))}
-                    onUpdateBankBalance={(bal) => setData(p => ({...p, bankBalance: bal}))}
-                    onUpdateCards={(cards) => setData(p => ({...p, cards}))}
-                    onUpdateDiscipline={(dsc) => setData(p => ({...p, discipline: dsc}))}
+                    onUpdateInventory={(inv) => updateData({inventory: inv})}
+                    onUpdateBank={(bank) => updateData({bank: bank})}
+                    onUpdateBankBalance={(bal) => updateData({bankBalance: bal})}
+                    onUpdateCards={(cards) => updateData({cards: cards})}
+                    onUpdateDiscipline={(dsc) => handleSetDiscipline(dsc)}
                     onUseItem={handleUseItem}
                     INVENTORY_SLOTS={INVENTORY_SLOTS}
                 />
             </div>
          )}
 
+         {/* SHOP TAB (RESTORED FULL PAGE) */}
          {activeTab === 'shop' && (
              <ShopFullPage onPurchase={purchaseItem} discipline={data.discipline} />
          )}
          
+         {/* PROFILE TAB */}
          {activeTab === 'profile' && (
           <div className="space-y-6 animate-in fade-in duration-500">
              <div className="flex justify-end mb-4">
@@ -810,8 +792,8 @@ export default function VaultDashboard() {
          {activeTab === 'inputs' && (
              <div className="p-6 rounded-xl max-w-4xl mx-auto bg-[#2b3446] border border-[#404e6d] animate-in fade-in duration-500">
                  <InputGroup title="Liquid & Income">
-                     <InputField label="Cash on Hand ($)" value={data.cash} onChange={(v) => setData({...data, cash: parseInt(v)||0})} />
-                     <InputField label="Monthly Income ($)" value={data.monthlyIncome} onChange={(v) => setData({...data, monthlyIncome: parseInt(v)||0})} />
+                     <InputField label="Cash on Hand ($)" value={data.cash} onChange={(v) => updateNestedData('cash', parseInt(v)||0)} />
+                     <InputField label="Monthly Income ($)" value={data.monthlyIncome} onChange={(v) => updateNestedData('monthlyIncome', parseInt(v)||0)} />
                  </InputGroup>
                  <InputGroup title="Investments & Assets">
                      <InputField label="Real Estate Equity ($)" value={data.assets.realEstate} onChange={(v) => updateAsset('realEstate', v)} />
@@ -829,6 +811,7 @@ export default function VaultDashboard() {
                  </InputGroup>
              </div>
          )}
+
       </main>
     </div>
   );
