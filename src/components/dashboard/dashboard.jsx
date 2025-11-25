@@ -1,23 +1,23 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useGameStore } from '../../store/gamestore'; // <-- NEW IMPORT
+import { useGameStore } from '../../store/gamestore'; 
 
-// 1. Data Import
+// 1. Data Import (Path Fixed)
 import { 
   SHOP_ITEMS, CARD_DATABASE, SKILL_DETAILS, 
   INVENTORY_SLOTS, USER_NAME, MAX_TOTAL_LEVEL 
 } from '../../data/gamedata'; 
 
-// 2. UI Components Import
+// 2. UI Components Import (Path Fixed)
 import { 
   WellnessBar, InventoryGrid, ContractWidget, CollectionBinder, 
   SkillCard, MasteryModal, MasteryLogWidget, AssetBar, 
   InputGroup, InputField, SkillDetailModal
-} from '../../components/dashboard/dashboardui'; 
+} from './dashboardui'; 
 
-// 3. Utils Import
+// 3. Utils Import (Path Fixed)
 import { RenderIcon, IconMap } from './dashboardutils';
 
-// 4. Feature Imports
+// 4. Feature Imports (Paths Fixed)
 import InventoryView from './inventoryprototype'; 
 import StatisticsTab from './statisticstab'; 
 import ShopFullPage from './shopfullpage'; 
@@ -25,26 +25,31 @@ import EstatePrototype from './estateprototype';
 
 export default function VaultDashboard() {
   
-  // --- STATE CONNECTION (Replaces all internal state logic) ---
+  // --- STATE CONNECTION: IMPORTING DATA AND ACTIONS ---
   const { 
     data, 
     loading, 
     loadGame, 
     saveGame, 
-    updateWellness, // Use specific action
-    setDiscipline, // Use specific action
-    updateNestedData // Generic action for inputs
+    updateWellness, 
+    setDiscipline, 
+    updateNestedData,
+    manualGrind, 
+    updateData, 
+    purchaseItemAction, 
+    handleUseItemAction, 
+    handleSellCardAction, 
+    toggleAchievementAction, 
+    handleClaimMasteryRewardAction, 
+    pendingPackOpen 
   } = useGameStore();
 
   // --- LIFECYCLE HOOKS ---
   
   // 1. Load Data and Auto-Save Timer
   useEffect(() => {
-      // Set the temporary user ID (will be replaced by Auth later)
-      // NOTE: In a real app, loadGame would be called after successful Firebase Auth
       loadGame(); 
 
-      // Auto-save every 60 seconds (replaces localStorage setItem)
       const saveInterval = setInterval(() => {
           saveGame();
       }, 60000); 
@@ -54,10 +59,9 @@ export default function VaultDashboard() {
 
   // 2. Vital Decay Loop
   useEffect(() => {
-    if (loading) return; // Wait until data is loaded
+    if (loading) return; 
     
     const timer = setInterval(() => {
-        // Use the store action to update wellness (this replaces prev => ({ ... }))
         updateWellness('energy', -1);
         updateWellness('hydration', -1);
         updateWellness('focus', -1);
@@ -83,24 +87,14 @@ export default function VaultDashboard() {
   const colors = { bg: "#2b3446", border: "#404e6d", accentSecondary: "#78643e", accentPrimary: "#e1b542" };
 
 
-  // --- HELPERS (Now use store actions directly) ---
+  // --- UI HELPERS ---
   const showToast = useCallback((msg, type = 'info') => { 
       setToast({ msg, type }); 
       setTimeout(() => setToast(null), 3000); 
   }, []);
 
   const handleSetDiscipline = (valOrFn) => {
-    // Uses the store action
     setDiscipline(valOrFn);
-  };
-  
-  // NOTE: All other complex data update handlers (like manualGrind, toggleAchievement, etc.) 
-  // currently still live inside this component and call local logic to simulate the flow. 
-  // The next phase will be to move these functions into the useGameStore file.
-  // For now, we will use a generic updateData function until those functions are migrated.
-  
-  const updateData = (updater) => {
-    useGameStore.getState().updateData(updater);
   };
   
   const toggleWidget = (key) => {
@@ -112,6 +106,8 @@ export default function VaultDashboard() {
         }
     }));
   };
+
+  // --- DRAG & DROP LOGIC (Relies on store's updateData) ---
 
   const handleDragStart = (e, widgetId, column, tab) => {
     e.dataTransfer.setData("widgetId", widgetId);
@@ -150,184 +146,77 @@ export default function VaultDashboard() {
     setDragItem(null);
   };
 
-  const addToSlotArray = (slots, item, quantity = 1) => {
-      const newSlots = [...slots];
-      const existingIndex = newSlots.findIndex(s => s && s.name === item.name && s.rarity === item.rarity);
-      if (existingIndex !== -1) {
-          newSlots[existingIndex] = { ...newSlots[existingIndex], count: newSlots[existingIndex].count + quantity };
-          return newSlots;
-      }
-      const emptyIndex = newSlots.findIndex(s => s === null);
-      if (emptyIndex !== -1) {
-          newSlots[emptyIndex] = { ...item, count: quantity, id: Date.now() + Math.random() };
-          return newSlots;
-      }
-      return null;
-  };
+  // --- BUSINESS LOGIC WRAPPERS (Calling Store Actions) ---
+  
+  // UI wrapper for the manualGrind store action (Calls store, handles toast)
+  const handleGrindAction = (skillKey, mpReward, energyCost) => {
+    const success = manualGrind(skillKey, mpReward, energyCost);
 
-  const generatePackCards = (packType) => {
-      let weights = { c: 60, u: 30, r: 8, e: 1.9, l: 0.1 };
-      let cardCount = 3;
-      if (packType === 'Epic') { weights = { c: 20, u: 40, r: 30, e: 9, l: 1 }; cardCount = 5; } 
-      else if (packType === 'Legendary') { weights = { c: 0, u: 10, r: 40, e: 40, l: 10 }; cardCount = 5; }
-      
-      const newCards = [];
-      for(let i=0; i<cardCount; i++) {
-        const rand = Math.random() * 100;
-        let cardRarity = 'Common';
-        if (rand > (100 - weights.l)) cardRarity = 'Legendary';
-        else if (rand > (100 - weights.l - weights.e)) cardRarity = 'Epic';
-        else if (rand > (100 - weights.l - weights.e - weights.r)) cardRarity = 'Rare';
-        else if (rand > (100 - weights.l - weights.e - weights.r - weights.u)) cardRarity = 'Uncommon';
-        
-        const pool = CARD_DATABASE.filter(c => c.rarity === cardRarity);
-        const card = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : CARD_DATABASE[0];
-        newCards.push(card);
-      }
-      return newCards;
-  };
-
-  // NOTE: updateWellness now comes directly from the store, simplifying this logic block.
-  // const updateWellness = (type, amount) => { ... } // REMOVED
-
-  const manualGrind = (skillKey, mpReward, energyCost) => {
-    if (data.wellness.energy >= energyCost) {
-      updateData(prev => {
-        const newIncomeBase = (skillKey === 'inc') ? prev.lifetime.totalIncomeBase + (mpReward * 12) : prev.lifetime.totalIncomeBase;
-        
-        return ({
-          wellness: { ...prev.wellness, energy: prev.wellness.energy - energyCost },
-          bonusXP: { ...prev.bonusXP, [skillKey]: (prev.bonusXP?.[skillKey] || 0) + 10 },
-          discipline: prev.discipline + mpReward,
-          lifetime: { ...prev.lifetime, totalIncomeBase: newIncomeBase }
-        });
-      });
+    if (success) {
       showToast(`+10 ${skillKey.toUpperCase()} XP | +${mpReward} DSC`, 'success');
     } else {
       showToast("Not enough energy!", 'error');
     }
   };
 
-  const handleUseItem = (item, index, containerId) => {
-      if(containerId !== 'inventory') { showToast("Move to Backpack to use", "error"); return; }
 
-      const incrementPackStat = (prev) => ({ ...prev.statistics, packsOpened: (prev.statistics.packsOpened || 0) + 1 });
-
-      if (item.type === 'Box') {
-          const newSlots = [...data.inventory];
-          if (newSlots[index].count > 1) newSlots[index].count--; else newSlots[index] = null;
-          const pack = { name: "Standard Pack", type: "Pack", desc: "3 Cards", iconName: "Package", rarity: "Uncommon" };
-          let updatedSlots = newSlots;
-          for(let i=0; i<5; i++) {
-              const nextSlots = addToSlotArray(updatedSlots, pack, 1);
-              if(nextSlots) updatedSlots = nextSlots;
-          }
-          updateData(prev => ({ inventory: updatedSlots }));
-          showToast("Box Opened! 5 Packs added.");
-
-      } else if (item.type === 'Pack') {
-          const newSlots = [...data.inventory];
-          if (newSlots[index].count > 1) newSlots[index].count--; else newSlots[index] = null;
-          const newCards = generatePackCards(item.rarity);
-          updateData(prev => ({
-              statistics: incrementPackStat(prev),
-              inventory: newSlots,
-              cards: [...prev.cards, ...newCards.map(c => c.id)]
-          }));
-          setPackOpening(newCards);
-      }
-  };
-
+  // Refactored purchaseItem to call the store action
   const purchaseItem = (item, category) => {
-    if (data.discipline >= item.cost) {
-      const incrementBought = (prev) => ({...prev.statistics, itemsBought: (prev.statistics.itemsBought || 0) + 1 });
-
-      if (category === 'gear' || category === 'packs') {
-          const updatedInv = addToSlotArray(data.inventory, item, 1);
-          if (!updatedInv) { showToast("Inventory Full!", 'error'); return; }
-          updateData(prev => ({ 
-              statistics: incrementBought(prev),
-              discipline: prev.discipline - item.cost, 
-              inventory: updatedInv 
-          }));
-      } else {
-          updateData(prev => ({
-              statistics: incrementBought(prev),
-              discipline: prev.discipline - item.cost,
-              bonusXP: { ...prev.bonusXP, [item.skillId]: (prev.bonusXP?.[item.skillId] || 0) + item.xpAmount }
-          }));
-      }
-      showToast(`Purchased ${item.name}`, 'success');
-    } else { showToast("Not enough DSC", 'error'); }
+    const result = purchaseItemAction(item, category); 
+    
+    if (result.success && (item.type === 'Pack' || item.type === 'Box')) {
+        setPackOpening(null);
+    }
+    
+    showToast(result.message, result.success ? 'success' : 'error');
   };
 
+  // Refactored handleUseItem to call the store action
+  const handleUseItem = (item, index, containerId) => {
+      const result = handleUseItemAction(item, index, containerId);
+
+      if (result.success && item.type === 'Pack') {
+          // Note: pendingPackOpen is a temporary state in the store used only for this UI action
+          setPackOpening(pendingPackOpen); 
+      }
+      
+      showToast(result.message, result.success ? 'success' : 'error');
+  };
+
+  // NEW: Refactored handleSellCard to call the store action
   const handleSellCard = (cardId, value) => {
-      const index = data.cards.indexOf(cardId);
-      if (index > -1) {
-          const newCards = [...data.cards];
-          newCards.splice(index, 1); 
-          updateData(prev => ({
-              statistics: { 
-                  ...prev.statistics, 
-                  cardsSold: (prev.statistics.cardsSold || 0) + 1,
-                  totalDisciplineEarned: (prev.statistics.totalDisciplineEarned || 0) + value 
-              },
-              cards: newCards,
-              discipline: prev.discipline + value
-          }));
-          showToast(`Sold card for ${value} DSC`, 'success');
-      }
+      const result = handleSellCardAction(cardId, value);
+      showToast(result.message, result.success ? 'success' : 'error');
   };
 
+  // NEW: Refactored toggleAchievement to call the store action
   const toggleAchievement = (id) => {
     const achievement = data.achievements.find(a => a.id === id);
     if(!achievement) return;
     const isCompleting = !achievement.completed;
     
-    let newInventory = [...data.inventory];
-    let rewardMsg = "";
-    
-    if (isCompleting && achievement.rewardItem) {
-        const updatedInv = addToSlotArray(newInventory, achievement.rewardItem, achievement.rewardItem.count || 1);
-        if (updatedInv) { newInventory = updatedInv; rewardMsg = ` + ${achievement.rewardItem.name}`; } 
-        else { showToast("Inventory full! Reward discarded.", "error"); }
+    const result = toggleAchievementAction(id, isCompleting);
+
+    if (result.success) {
+      showToast(`${isCompleting ? 'Completed' : 'Reset'}: ${achievement.title}${result.rewardMsg}`, 'success');
+    } else {
+      showToast("Contract update failed.", 'error'); 
     }
-
-    updateData(prev => {
-        const newStats = { ...prev.statistics };
-        if (isCompleting) newStats.contractsCompleted = (newStats.contractsCompleted || 0) + 1;
-        return { statistics: newStats, inventory: newInventory, achievements: prev.achievements.map(a => a.id === id ? { ...a, completed: !a.completed } : a) };
-    });
-
-    if (isCompleting) { showToast(`Completed: ${achievement.title}${rewardMsg}`, 'success'); }
   };
   
+  // NEW: Refactored handleClaimMasteryReward to call the store action
   const handleClaimMasteryReward = (skillId, level, reward) => {
-      let newInventory = [...data.inventory];
-      let newDiscipline = data.discipline;
+    const result = handleClaimMasteryRewardAction(skillId, level, reward);
 
-      if (reward.type === 'Item' || reward.type === 'Gear' || reward.type === 'Trophy' || reward.type === 'Consumable') {
-          const updatedInv = addToSlotArray(newInventory, reward, 1);
-          if (!updatedInv) { showToast("Inventory Full! Cannot claim reward.", 'error'); return; }
-          newInventory = updatedInv;
-      } else if (reward.type === 'Discipline') {
-          newDiscipline += reward.amount;
-      }
-
-      updateData(prev => ({
-          discipline: newDiscipline,
-          inventory: newInventory,
-          lifetime: {
-              ...prev.lifetime,
-              claimedMasteryRewards: {
-                  ...prev.lifetime.claimedMasteryRewards,
-                  [skillId]: [...(prev.lifetime.claimedMasteryRewards[skillId] || []), level]
-              }
-          }
-      }));
-      setSkillModal(null); 
-      showToast(`Reward Claimed: ${reward.name} (+1 item)`, 'success');
+    if (result.success) {
+        setSkillModal(null); 
+        showToast(result.message, 'success');
+    } else {
+        showToast(result.message || "Cannot claim reward.", 'error');
+    }
   };
+
+  // --- MEMOIZED CALCULATIONS (Read-Only) ---
 
   const financials = useMemo(() => {
       const totalAssets = Object.values(data.assets || {}).reduce((a, b) => Number(a || 0) + Number(b || 0), 0) + Number(data.cash || 0);
@@ -348,8 +237,7 @@ export default function VaultDashboard() {
         costIncrease = newValue - oldValue;
     }
     
-    // Use the generic store update action
-    useGameStore.getState().updateNestedData(path, newValue);
+    updateNestedData(path, newValue);
     
     if (costIncrease > 0) {
         updateData(prev => ({
@@ -367,8 +255,7 @@ export default function VaultDashboard() {
     const oldValue = data.liabilities[key] || 0;
     const debtPaid = Math.max(0, oldValue - newValue);
     
-    // Use the generic store update action
-    useGameStore.getState().updateNestedData(path, newValue);
+    updateNestedData(path, newValue);
 
     if (debtPaid > 0) {
         updateData(prev => ({
@@ -484,7 +371,7 @@ export default function VaultDashboard() {
                 <WellnessBar label="Hydration" value={data.wellness.hydration} iconName="Droplet" color="bg-blue-400" onFill={() => updateWellness('hydration', 20)} task="Drink Water" />
                 <WellnessBar label="Focus" value={data.wellness.focus} iconName="Brain" color="bg-purple-400" onFill={() => updateWellness('focus', 20)} task="Deep Work" />
              </div>}
-             {dailyOpsTab === 'grind' && <div className="grid grid-cols-4 gap-2 animate-in fade-in">{[{k:'cod',l:'Write Code',c:'text-blue-400',i:"Code",e:5,r:10},{k:'net',l:'Network',c:'text-purple-400',i:"Users",e:5,r:10},{k:'cnt',l:'Post Content',c:'text-amber-400',i:"Target",e:5,r:10},{k:'inc',l:'Freelance',c:'text-emerald-400',i:"DollarSign",e:10,r:10}].map((g,i)=><button key={i} onClick={() => manualGrind(g.k, g.r, g.e)} className="p-3 bg-[#2a2a2a] hover:bg-[#333] rounded border border-slate-700 flex flex-col items-center justify-center gap-1 transition-all active:scale-95"><RenderIcon name={g.i} size={20} className={g.c}/><span className="text-[10px] font-bold text-slate-300">{g.l}</span><span className="text-[9px] text-slate-500">-{g.e} NRG</span></button>)}</div>}
+             {dailyOpsTab === 'grind' && <div className="grid grid-cols-4 gap-2 animate-in fade-in">{[{k:'cod',l:'Write Code',c:'text-blue-400',i:"Code",e:5,r:10},{k:'net',l:'Network',c:'text-purple-400',i:"Users",e:5,r:10},{k:'cnt',l:'Post Content',c:'text-amber-400',i:"Target",e:5,r:10},{k:'inc',l:'Freelance',c:'text-emerald-400',i:"DollarSign",e:10,r:10}].map((g,i)=><button key={i} onClick={() => handleGrindAction(g.k, g.r, g.e)} className="p-3 bg-[#2a2a2a] hover:bg-[#333] rounded border border-slate-700 flex flex-col items-center justify-center gap-1 transition-all active:scale-95"><RenderIcon name={g.i} size={20} className={g.c}/><span className="text-[10px] font-bold text-slate-300">{g.l}</span><span className="text-[9px] text-slate-500">-{g.e} NRG</span></button>)}</div>}
           </div>
         );
       case 'contract': 
@@ -609,7 +496,31 @@ export default function VaultDashboard() {
       {/* Toast, Modals, Header... (Keep existing) */}
       {toast && <div className="fixed top-20 right-4 z-[100] bg-[#232a3a] border border-amber-500 text-white px-4 py-3 rounded shadow-xl"><RenderIcon name="Zap" size={16} className="text-amber-500" /> <span className="text-sm font-bold">{toast.msg}</span></div>}
       
-      {/* Modals: Skill Detail and Mastery Log */}
+      {/* Modals: Pack Opening (uses local state set by the handleUseItem wrapper) */}
+      {packOpening && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
+            <div className="bg-[#1a1a1a] border border-slate-700 w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl flex flex-col p-6 text-center">
+                <h3 className="text-3xl font-bold text-amber-400 mb-6 flex items-center justify-center gap-3">
+                    <RenderIcon name="Sparkles" size={32}/> PACK OPENED!
+                </h3>
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-4">
+                    {packOpening.map((card, index) => (
+                        <div key={index} className={`aspect-[2/3] rounded-xl border-2 p-3 flex flex-col items-center justify-center text-center relative animate-in zoom-in-50 duration-500 delay-${index*50}`}>
+                            <div className={`p-2 rounded-full ${card.rarity.toLowerCase().includes('legendary') ? 'bg-amber-900/50' : 'bg-black/50'}`}>
+                                <RenderIcon name={card.iconName} size={30} className={card.rarity.toLowerCase().includes('legendary') ? 'text-amber-400' : 'text-white'} />
+                            </div>
+                            <div className="text-[10px] font-bold mt-2 text-white">{card.name}</div>
+                            <div className="text-[8px] uppercase opacity-70 text-slate-300">{card.rarity}</div>
+                        </div>
+                    ))}
+                </div>
+                <button onClick={() => setPackOpening(null)} className="mt-8 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg shadow-lg">
+                    Continue to Binder
+                </button>
+            </div>
+        </div>
+      )}
+
       {skillModal && (
         <MasteryModal 
             skill={skillModal} 
@@ -755,9 +666,7 @@ export default function VaultDashboard() {
                    <div className="bg-[#1e1e1e] border border-slate-700 rounded-lg p-2 flex gap-2 mr-4 items-center shadow-xl animate-in fade-in zoom-in">
                       <div className="text-xs font-bold text-slate-400 px-2 uppercase tracking-wider border-r border-slate-700 mr-1">Profile Config</div>
                       {['player_card', 'p_vitals', 'financial_overview', 'unified_menu', 'active_contracts', 'collection', 'mastery_log_btn', 'mastery_log_widget'].map(k => (
-                         <button key={k} onClick={() => toggleWidgetConfig(k)} className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${data.widgetConfig[k] ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
-                           {k === 'mastery_log_btn' ? 'Mastery Btn' : k.replace(/_/g,' ')}
-                         </button>
+                         <button key={k} onClick={() => toggleWidgetConfig(k)} className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${data.widgetConfig[k] ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>{k.replace('_',' ')}</button>
                       ))}
                    </div>
                 )}
