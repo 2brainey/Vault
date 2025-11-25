@@ -300,8 +300,19 @@ export const SHOP_ITEMS = {
     { id: 'b4', name: "AI Symposium", cost: 600, effect: "+6,000 AI XP", iconName: "Sparkles", skillId: 'ai', xpAmount: 6000, color: "text-pink-400", rarity: "Epic", type: "Booster" },
     { id: 'b5', name: "Real Estate Course", cost: 1000, effect: "+10,000 Estate XP", iconName: "Hammer", skillId: 'est', xpAmount: 10000, color: "text-amber-600", rarity: "Legendary", type: "Booster" },
     { id: 'b6', name: "Sales Masterclass", cost: 400, effect: "+4,000 Income XP", iconName: "DollarSign", skillId: 'inc', xpAmount: 4000, color: "text-green-400", rarity: "Rare", type: "Booster" },
+    
+    // START: RE-INTRODUCING MISSING BOOSTERS (7 more for 13 total skills)
+    { id: 'b7', name: "Fortress Plan", cost: 450, effect: "+4,500 Security XP", iconName: "Shield", skillId: 'sec', xpAmount: 4500, color: "text-slate-300", rarity: "Rare", type: "Booster" },
+    { id: 'b8', name: "Biohack Training", cost: 350, effect: "+3,500 Vitality XP", iconName: "Heart", skillId: 'vit', xpAmount: 3500, color: "text-red-400", rarity: "Rare", type: "Booster" },
+    { id: 'b9', name: "Historical Texts", cost: 550, effect: "+5,500 Wisdom XP", iconName: "Star", skillId: 'wis', xpAmount: 5500, color: "text-indigo-400", rarity: "Rare", type: "Booster" },
+    { id: 'b10', name: "Resource Mapping", cost: 650, effect: "+6,500 Assets XP", iconName: "Pickaxe", skillId: 'ast', xpAmount: 6500, color: "text-yellow-500", rarity: "Epic", type: "Booster" },
+    { id: 'b11', name: "Liquidity Drill", cost: 300, effect: "+3,000 Cash Flow XP", iconName: "Activity", skillId: 'flo', xpAmount: 3000, color: "text-green-500", rarity: "Uncommon", type: "Booster" },
+    { id: 'b12', name: "Mindfulness Retreat", cost: 800, effect: "+8,000 Discipline XP", iconName: "Flame", skillId: 'dis', xpAmount: 8000, color: "text-amber-500", rarity: "Epic", type: "Booster" },
+    { id: 'b13', name: "Audience Workshop", cost: 700, effect: "+7,000 Content XP", iconName: "Target", skillId: 'cnt', xpAmount: 7000, color: "text-pink-400", rarity: "Rare", type: "Booster" },
+    // END: MISSING BOOSTERS
   ],
   gear: [
+    // IMPORTANT: g1 is the Estate Deed. We must use its ID later.
     { id: 'g1', name: "Estate Deed", cost: 50000, effect: "Unlocks Estate Planning", iconName: "Building", rarity: "Legendary", color: "text-amber-400", type: "Item" },
     { id: 'g2', name: "Server Farm", cost: 15000, effect: "Passive Income Gen", iconName: "Server", rarity: "Epic", color: "text-blue-500", type: "Item" },
     { id: 'g3', name: "Angel Syndicate", cost: 10000, effect: "Access to Deal Flow", iconName: "Users", rarity: "Epic", color: "text-purple-500", type: "Item" },

@@ -10,10 +10,8 @@ import {
 import { 
   WellnessBar, InventoryGrid, ContractWidget, CollectionBinder, 
   SkillMatrix, AssetBar, InputGroup, InputField, SkillCard, 
-  MasteryModal, 
-  SkillDetailModal,
-  MasteryLogWidget // IMPORTED NEW STANDALONE WIDGET
-} from '../../components/dashboard/dashboardui'; // FIX: Ensure relative path is correct
+  MasteryModal, SkillDetailModal, MasteryLogWidget 
+} from './dashboardui';
 
 // 3. Utils Import
 import { RenderIcon, getRarityColor, getRarityGradient, IconMap } from './dashboardutils';
@@ -25,10 +23,9 @@ import ShopFullPage from './shopfullpage';
 import EstatePrototype from './estateprototype'; 
 
 export default function VaultDashboard() {
-  // --- STATE INITIALIZATION (Uses updated initialData from gamedata.js) ---
+  // --- STATE INITIALIZATION ---
   const [data, setData] = useState(() => {
     try {
-      // FIX: Changed local storage key to force loading new initial data (v29.1)
       const saved = localStorage.getItem('vault_data_v29.1'); 
       const loaded = saved ? JSON.parse(saved) : initialData;
       
@@ -87,7 +84,6 @@ export default function VaultDashboard() {
   const colors = { bg: "#2b3446", border: "#404e6d", accentSecondary: "#78643e", accentPrimary: "#e1b542" };
 
   useEffect(() => {
-    // FIX: Using new key to ensure fresh data load 
     localStorage.setItem('vault_data_v29.1', JSON.stringify(data));
   }, [data]);
 
@@ -280,11 +276,18 @@ export default function VaultDashboard() {
       if (category === 'gear' || category === 'packs') {
           const updatedInv = addToSlotArray(data.inventory, item, 1);
           if (!updatedInv) { showToast("Inventory Full!", 'error'); return; }
+          
+          // Check for Estate Deed unlock
+          let newInventory = updatedInv;
+          if (item.id === 'g1') {
+             showToast(`Estate Unlocked! Find your new Deed in Inventory.`, 'success');
+          }
+
           setData(prev => ({ 
               ...prev, 
               statistics: incrementBought(prev),
               discipline: prev.discipline - item.cost, 
-              inventory: updatedInv 
+              inventory: newInventory 
           }));
       } else {
           setData(prev => ({
@@ -474,7 +477,7 @@ export default function VaultDashboard() {
   }, [playerSkills]);
   
   const activeContracts = (data.achievements || []).filter(a => !a.completed);
-  const completedContracts = (data.achievements || []).filter(a => a.completed);
+  const completedContracts = (data.achievements || []).filter(a => !a.completed);
   const sortedActive = [...activeContracts].sort((a,b) => a.xp - b.xp); 
   const priorityContract = sortedActive[0] || { title: "All Complete", desc: "You are a legend.", xp: 0 };
   const displayContracts = questFilter === 'active' ? sortedActive : 
@@ -489,7 +492,6 @@ export default function VaultDashboard() {
   const renderWidget = (widgetId) => {
     const isVisible = data.widgetConfig?.[widgetId];
     if (!isVisible && !editMode) return null;
-    // FIX: Using flexible outer wrapper class with h-fit for content, but ensuring flex-col for internal stacking
     const commonWrapperClass = `rounded-xl border shadow-lg relative mb-6 transition-all flex flex-col ${editMode ? 'cursor-move border-dashed border-slate-500 hover:bg-slate-800/50' : 'bg-[#1e1e1e] border-[#404e6d]'} ${!isVisible && editMode ? 'opacity-50' : ''}`;
     const toggleBtn = editMode && <button onClick={() => toggleWidgetConfig(widgetId)} className="absolute top-2 right-2 p-1 bg-black/50 rounded z-20 text-white hover:bg-black">{isVisible ? <RenderIcon name="Eye" size={14}/> : <RenderIcon name="EyeOff" size={14}/>}</button>;
     const dragHandle = editMode && <div className="absolute top-2 left-2 text-slate-500"><RenderIcon name="GripVertical" size={16}/></div>;
@@ -548,25 +550,9 @@ export default function VaultDashboard() {
         );
       case 'shop':
         return (
-          <div className={`${commonWrapperClass} p-4 h-fit`}>
+          <div className={`${commonWrapperClass} p-0 overflow-hidden bg-[#1e1e1e]`}>
              {toggleBtn}{dragHandle}
-             <div className="flex justify-between items-center mb-4 pl-4">
-                 <h3 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2"><RenderIcon name="ShoppingBag" size={14}/> Black Market</h3>
-                 <div className="flex gap-1">
-                    {['boosters', 'gear', 'packs'].map(tab => (
-                        <button key={tab} onClick={() => setMiniShopTab(tab)} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${miniShopTab === tab ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white'}`}>{tab}</button>
-                    ))}
-                 </div>
-             </div>
-             <div className="space-y-2 pr-1">
-                 {SHOP_ITEMS[miniShopTab].slice(0,3).map(item => (
-                    <div key={item.id} className="flex items-center justify-between p-3 rounded bg-[#2a2a2a] border border-[#333] group hover:border-amber-500 transition-colors">
-                       <div className="flex items-center gap-3"><span className={`${item.color}`}><RenderIcon name={item.iconName} /></span><div><div className="text-xs font-bold text-slate-200">{item.name}</div><div className="text-[9px] text-slate-500">{item.effect}</div></div></div>
-                       <button onClick={() => purchaseItem(item, miniShopTab)} className="px-2 py-1 bg-emerald-900/30 text-emerald-400 text-[10px] rounded border border-emerald-800 hover:bg-emerald-500 hover:text-black transition-colors whitespace-nowrap">{item.cost} DSC</button>
-                    </div>
-                 ))}
-                 <button onClick={() => setActiveTab('shop')} className="w-full py-2 text-xs text-slate-500 hover:text-white mt-2 border-t border-slate-700">VIEW FULL MARKET</button>
-             </div>
+             <ShopFullPage onPurchase={purchaseItem} discipline={data.discipline} />
           </div>
         );
       case 'welcome': return null; 
@@ -575,7 +561,6 @@ export default function VaultDashboard() {
       case 'p_vitals': return (<div className={`${commonWrapperClass} p-4 h-fit`}>{toggleBtn}{dragHandle}<h3 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2 pl-4"><RenderIcon name="Activity" size={14}/> Daily Vitals</h3><div className="space-y-4"><WellnessBar label="Energy" value={data.wellness.energy} iconName="Zap" color="bg-yellow-400" onFill={() => updateWellness('energy', 20)} task="Sleep 8h" /><WellnessBar label="Hydration" value={data.wellness.hydration} iconName="Droplet" color="bg-blue-400" onFill={() => updateWellness('hydration', 20)} task="Drink Water" /><WellnessBar label="Focus" value={data.wellness.focus} iconName="Brain" color="bg-purple-400" onFill={() => updateWellness('focus', 20)} task="Deep Work" /></div></div>);
       case 'financial_overview': return (<div className={`${commonWrapperClass} p-6 h-fit`}>{toggleBtn}{dragHandle}<h3 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2 pl-4"><RenderIcon name="Lock" size={14}/> Financial War Room</h3><div className="grid grid-cols-2 gap-4 mb-6"><div className="bg-black/20 p-3 rounded"><div className="text-[10px] text-slate-400">NET WORTH</div><div className="font-mono text-lg text-white">${financials.netWorth.toLocaleString()}</div></div><div className="bg-black/20 p-3 rounded"><div className="text-[10px] text-slate-400">RUNWAY</div><div className="font-mono text-lg text-emerald-400">{financials.runwayMonths}m</div></div></div><div className="space-y-4"><AssetBar label="Real Estate" value={data.assets.realEstate} total={financials.totalAssets} color="#10b981" /><AssetBar label="Digital IP" value={data.assets.digitalIP} total={financials.totalAssets} color="#3b82f6" /><AssetBar label="Metals" value={data.assets.metals} total={financials.totalAssets} color={colors.accentPrimary} /><AssetBar label="Crypto" value={data.assets.crypto} total={financials.totalAssets} color="#a855f7" /></div></div>);
       
-      // MODIFIED: Simplified unified_menu
       case 'unified_menu': return (<div className={`${commonWrapperClass} p-6 h-fit flex flex-col`}>
              {toggleBtn}{dragHandle}
              <div className="flex space-x-2 mb-6 border-b border-slate-700 pb-2 overflow-x-auto pl-4">
@@ -593,14 +578,11 @@ export default function VaultDashboard() {
              {profileWidgetTab === 'inventory' && <InventoryGrid inventory={data.inventory} mp={data.discipline} onUseItem={handleUseItem} />}
           </div>);
       
-      // NEW WIDGET CASE: Mastery Log Overview (Standalone Widget)
       case 'mastery_log_widget': 
         return (
-            // FIX: Removed h-fit from the inner commonWrapperClass block as well, letting the internal content dictate height up to max-h
             <div className={`${commonWrapperClass} p-6 flex-1`}>
                 {toggleBtn}{dragHandle}
-                {/* FIX: Removed flex-1/min-h, allowing the component to size based on its internal max-h */}
-                <div> 
+                <div className="flex-1 min-h-[300px]">
                     <MasteryLogWidget 
                         playerSkills={playerSkills}
                         totalXPs={totalXPs}
@@ -627,15 +609,13 @@ export default function VaultDashboard() {
     }
   };
 
+  const hasEstateDeed = data.inventory.some(item => item && item.id === 'g1');
 
-  // --- RENDER MAIN ---
   return (
-    // FIX: Using new local storage key to force loading new config
     <div className="min-h-screen text-slate-200 font-sans selection:bg-[#e1b542] selection:text-black pb-10" style={{ backgroundColor: colors.bg }}>
-      {/* Toast, Modals, Header... (Keep existing) */}
+      {/* Toast, Modals... */}
       {toast && <div className="fixed top-20 right-4 z-[100] bg-[#232a3a] border border-amber-500 text-white px-4 py-3 rounded shadow-xl"><RenderIcon name="Zap" size={16} className="text-amber-500" /> <span className="text-sm font-bold">{toast.msg}</span></div>}
       
-      {/* Modals: Skill Detail and Mastery Log */}
       {skillModal && (
         <MasteryModal 
             skill={skillModal} 
@@ -687,11 +667,19 @@ export default function VaultDashboard() {
               { id: 'shop', icon: "ShoppingBag", label: 'SHOP' }, 
               { id: 'inventory', icon: "Package", label: 'INVENTORY' },
               { id: 'stats', icon: "Activity", label: 'STATS' }, 
-              { id: 'estate', icon: "Home", label: 'ESTATE' }, 
+              { id: 'estate', icon: "Home", label: 'ESTATE', restricted: !hasEstateDeed }, // Apply restriction here
               { id: 'inputs', icon: "Code", label: 'INPUTS' } 
             ].map((tab) => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-2" style={{ backgroundColor: activeTab === tab.id ? colors.accentPrimary : 'transparent', color: activeTab === tab.id ? '#000' : '#94a3b8' }}>
-                <RenderIcon name={tab.icon} size={16} /> <span className="hidden md:inline">{tab.label}</span>
+              <button 
+                key={tab.id} 
+                onClick={() => !tab.restricted && setActiveTab(tab.id)} 
+                disabled={tab.restricted}
+                className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-2 ${tab.restricted ? 'opacity-50 cursor-not-allowed text-slate-600' : ''}`}
+                style={{ backgroundColor: activeTab === tab.id ? colors.accentPrimary : 'transparent', color: activeTab === tab.id ? '#000' : '#94a3b8' }}
+              >
+                {tab.restricted && <RenderIcon name="Lock" size={16} />}
+                {!tab.restricted && <RenderIcon name={tab.icon} size={16} />}
+                 <span className="hidden md:inline">{tab.label}</span>
               </button>
             ))}
           </nav>
@@ -700,7 +688,7 @@ export default function VaultDashboard() {
 
       <main className="max-w-6xl mx-auto p-4 md:p-8 relative">
          
-         {/* DYNAMIC TAB (Home) */}
+         {/* FIX: Ensure Home rendering only occurs when 'dynamic' is active */}
          {activeTab === 'dynamic' && (
              <div className="animate-in fade-in duration-500">
                 <div className="flex justify-end mb-4">
@@ -732,23 +720,29 @@ export default function VaultDashboard() {
                  </div>
              </div>
          )}
-
-         {/* STATS TAB */}
+         
+         {activeTab === 'estate' && (
+            <div className="animate-in fade-in duration-500 h-[calc(100vh-140px)]">
+                {hasEstateDeed ? (
+                    <EstatePrototype 
+                        discipline={data.discipline} 
+                        setDiscipline={(valOrFn) => handleSetDiscipline(valOrFn)} 
+                    />
+                ) : (
+                    <div className="h-full flex flex-col items-center justify-center bg-[#1e1e1e] border border-slate-700 rounded-xl p-10 text-center">
+                        <RenderIcon name="Lock" size={48} className="text-amber-500 mb-4"/>
+                        <h2 className="text-2xl font-bold text-white mb-2">Estate Locked</h2>
+                        <p className="text-slate-400 max-w-md">Purchase the **Estate Deed** from the Black Market's **Equipment** section to unlock your property and begin construction.</p>
+                        <button onClick={() => setActiveTab('shop')} className="mt-6 px-6 py-2 bg-amber-500 text-black font-bold rounded-lg hover:bg-amber-400">Go to Market</button>
+                    </div>
+                )}
+            </div>
+         )}
+         
          {activeTab === 'stats' && (
              <StatisticsTab stats={data.statistics} />
          )}
 
-         {/* ESTATE TAB */}
-         {activeTab === 'estate' && (
-            <div className="animate-in fade-in duration-500 h-[calc(100vh-140px)]">
-                <EstatePrototype 
-                  discipline={data.discipline} 
-                  setDiscipline={(valOrFn) => handleSetDiscipline(valOrFn)} 
-                />
-            </div>
-         )}
-
-         {/* INVENTORY TAB */}
          {activeTab === 'inventory' && (
             <div className="animate-in fade-in duration-500 h-[calc(100vh-140px)]">
                 <InventoryView 
@@ -768,12 +762,10 @@ export default function VaultDashboard() {
             </div>
          )}
 
-         {/* SHOP TAB (RESTORED FULL PAGE) */}
          {activeTab === 'shop' && (
              <ShopFullPage onPurchase={purchaseItem} discipline={data.discipline} />
          )}
          
-         {/* PROFILE TAB */}
          {activeTab === 'profile' && (
           <div className="space-y-6 animate-in fade-in duration-500">
              <div className="flex justify-end mb-4">
@@ -837,7 +829,6 @@ export default function VaultDashboard() {
                  </InputGroup>
              </div>
          )}
-
       </main>
     </div>
   );
