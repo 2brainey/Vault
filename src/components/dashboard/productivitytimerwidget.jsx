@@ -3,13 +3,17 @@ import { Play, Pause, RotateCcw } from 'lucide-react';
 
 const ProductivityTimerWidget = () => {
   // --- THEME CONSTANTS ---
-  const colors = { 
-    gold: '#e1b542', 
-    success: '#4ade80',
-    bronze: '#78643e',
-    slateBlue: '#404e6d',
-    darkBase: '#2b3446'
-  };
+// 2brainey/vault/Vault-c56edab4e9ba95c3fc4abb92c22f46eb83c3b7f6/src/components/dashboard/productivitytimerwidget.jsx
+
+// Lines 7-13: Replace old hardcoded definitions
+const colors = { 
+  gold: '#e1b542',       // vault-amber
+  success: '#4ade80',    // vault-success
+  bronze: '#78643e',     // vault-bronze
+  slateBlue: '#404e6d',  // vault-slate
+  darkBase: '#2b3446'    // vault-dark
+};
+// ... rest of the component uses these constants correctly for gradients and inline styles.
   const goldAccent = { color: colors.gold, textShadow: `0 0 8px ${colors.gold}80` };
 
   // --- STATE ---

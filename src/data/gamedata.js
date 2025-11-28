@@ -456,11 +456,12 @@ export const initialData = {
     player_card: true, p_vitals: true, financial_overview: true, unified_menu: true, active_contracts: true, collection: true,
     asset_wallet: true, 
     mastery_log_widget: true, // Force standalone widget visible
-    mastery_log_btn: true // Force button widget visible
+    mastery_log_btn: true, // Force button widget visible
+    productivity_timer: true,
   },
   layout: {
     home: {
-        left: ['daily_ops', 'contract'], 
+        left: ['daily_ops', 'contract', 'productivity_timer'], 
         right: ['shop', 'skills'] 
     },
     // UPDATED: Add mastery_log_widget to a column for initial display

@@ -21,7 +21,9 @@ import { RenderIcon, IconMap } from './dashboardutils';
 import InventoryView from './inventoryprototype'; 
 import StatisticsTab from './statisticstab'; 
 import ShopFullPage from './shopfullpage'; 
-import EstatePrototype from './estateprototype'; 
+import EstatePrototype from './estateprototype';
+import ProductivityTimerWidget from './productivitytimerwidget'; 
+import LogisticsDashboard from './logisticsdashboard';
 
 export default function VaultDashboard() {
   
@@ -86,7 +88,13 @@ export default function VaultDashboard() {
   const [packOpening, setPackOpening] = useState(null);
   const [dragItem, setDragItem] = useState(null);
 
-  const colors = { bg: "#2b3446", border: "#404e6d", accentSecondary: "#78643e", accentPrimary: "#e1b542" };
+  // NEW (Using the custom names):
+const colors = { 
+    bg: '#2b3446', // vault-dark
+    border: '#404e6d', // vault-border
+    accentSecondary: '#78643e', // vault-bronze
+    accentPrimary: '#e1b542' // vault-amber
+};
 
 
   // --- UI HELPERS ---
@@ -434,6 +442,16 @@ export default function VaultDashboard() {
             </div>
         );
 
+        // --- NEW CASE: PRODUCTIVITY TIMER (STEP 5.1 CODE) ---
+      case 'productivity_timer': 
+        return (
+          <div className={`${commonWrapperClass} p-0 h-fit`}>
+            {toggleBtn}{dragHandle}
+            <ProductivityTimerWidget /> 
+          </div>
+        );
+      // --------------------------------------------------
+
       case 'active_contracts': return (<div className={`${commonWrapperClass} p-0 h-fit`}>{toggleBtn}{dragHandle}<div className="p-4"><h3 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2"><RenderIcon name="Flame" size={14}/> Active Contracts</h3><ContractWidget contracts={displayContracts} onToggle={toggleAchievement} title="" /></div></div>);
       case 'collection': return (<div className={`${commonWrapperClass} p-6 h-fit`}>{toggleBtn}{dragHandle}<CollectionBinder cards={data.cards} onSell={handleSellCard} /></div>);
       
@@ -619,6 +637,13 @@ export default function VaultDashboard() {
          {/* SHOP TAB (RESTORED FULL PAGE) */}
          {activeTab === 'shop' && (
              <ShopFullPage onPurchase={purchaseItem} discipline={data.discipline} />
+         )}
+
+         {/* LOGISTICS TAB (NEW) - STEP 5.2 CODE */}
+         {activeTab === 'logisticsdashboard' && ( 
+             <div className="animate-in fade-in duration-500 h-[calc(100vh-140px)]">
+                 <LogisticsDashboard /> 
+             </div>
          )}
          
          {/* PROFILE TAB */}
