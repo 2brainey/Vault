@@ -23,6 +23,7 @@ import StatisticsTab from './statisticstab';
 import ShopFullPage from './shopfullpage'; 
 import EstatePrototype from './estateprototype';
 import ProductivityTimerWidget from './productivitytimerwidget'; 
+import TaskCommandCenterWidget from './taskcommandcenterwidget'; // NEW IMPORT
 import LogisticsDashboard from './logisticsdashboard';
 
 export default function VaultDashboard() {
@@ -120,7 +121,7 @@ const colors = {
 
         // 2. PLACEMENT CHECK: If we are TURNING THE WIDGET ON (setting to true)
         // AND it's a home widget that isn't placed yet, inject it.
-        if (!isCurrentlyEnabled && ['daily_ops', 'contract', 'skills', 'shop', 'productivity_timer'].includes(key)) {
+        if (!isCurrentlyEnabled && ['daily_ops', 'contract', 'skills', 'shop', 'productivity_timer', 'task_command_center'].includes(key)) {
             
             // Check if the widget exists in EITHER the left or right home column
             const isPlaced = newLayout.home.left.includes(key) || newLayout.home.right.includes(key);
@@ -369,7 +370,7 @@ const colors = {
                 <WellnessBar label="Hydration" value={data.wellness.hydration} iconName="Droplet" color="bg-blue-400" onFill={() => updateWellness('hydration', 20)} task="Drink Water" />
                 <WellnessBar label="Focus" value={data.wellness.focus} iconName="Brain" color="bg-purple-400" onFill={() => updateWellness('focus', 20)} task="Deep Work" />
              </div>}
-             {dailyOpsTab === 'grind' && <div className="grid grid-cols-4 gap-2 animate-in fade-in">{[{k:'cod',l:'Write Code',c:'text-blue-400',i:"Code",e:5,r:10},{k:'net',l:'Network',c:'text-purple-400',i:"Users",e:5,r:10},{k:'cnt',l:'Post Content',c:'text-amber-400',i:"Target",e:5,r:10},{k:'inc',l:'Freelance',c:'text-emerald-400',i:"DollarSign",e:10,r:10}].map((g,i)=><button key={i} onClick={() => handleGrindAction(g.k, g.r, g.e)} className="p-3 bg-[#2a2a2a] hover:bg-[#333] rounded border border-slate-700 flex flex-col items-center justify-center gap-1 transition-all active:scale-95"><RenderIcon name={g.i} size={20} className={g.c}/><span className="text-[10px] font-bold text-slate-300">{g.l}</span><span className="text-[9px] text-slate-500">-{g.e} NRG</span></button>)}</div>}
+             {dailyOpsTab === 'grind' && <div className="grid grid-cols-4 gap-2 p-2 bg-[#131313] rounded border border-slate-800 overflow-y-auto custom-scrollbar max-h-[400px] animate-in fade-in">{[{k:'cod',l:'Write Code',c:'text-blue-400',i:"Code",e:5,r:10},{k:'net',l:'Network',c:'text-purple-400',i:"Users",e:5,r:10},{k:'cnt',l:'Post Content',c:'text-amber-400',i:"Target",e:5,r:10},{k:'inc',l:'Freelance',c:'text-emerald-400',i:"DollarSign",e:10,r:10}].map((g,i)=><button key={i} onClick={() => handleGrindAction(g.k, g.r, g.e)} className="p-3 bg-[#2a2a2a] hover:bg-[#333] rounded border border-slate-700 flex flex-col items-center justify-center gap-1 transition-all active:scale-95"><RenderIcon name={g.i} size={20} className={g.c}/><span className="text-[10px] font-bold text-slate-300">{g.l}</span><span className="text-[9px] text-slate-500">-{g.e} NRG</span></button>)}</div>}
           </div>
         );
       case 'contract': 
@@ -480,6 +481,17 @@ const colors = {
         );
       // --------------------------------------------------
 
+      // --- NEW CASE: TASK COMMAND CENTER ---
+      case 'task_command_center': 
+        return (
+          <div className={`${commonWrapperClass} p-0 h-fit`}>
+            {toggleBtn}{dragHandle}
+            {/* onLaunchBoard is a placeholder function for the future full Kanban board tab */}
+            <TaskCommandCenterWidget onLaunchBoard={() => showToast('Launching Kanban Board...', 'info')} /> 
+          </div>
+        );
+      // ------------------------------------
+
       case 'active_contracts': return (<div className={`${commonWrapperClass} p-0 h-fit`}>{toggleBtn}{dragHandle}<div className="p-4"><h3 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2"><RenderIcon name="Flame" size={14}/> Active Contracts</h3><ContractWidget contracts={displayContracts} onToggle={toggleAchievement} title="" /></div></div>);
       case 'collection': return (<div className={`${commonWrapperClass} p-6 h-fit`}>{toggleBtn}{dragHandle}<CollectionBinder cards={data.cards} onSell={handleSellCard} /></div>);
       
@@ -502,7 +514,7 @@ const colors = {
   return (
     <div className="min-h-screen text-slate-200 font-sans selection:bg-[#e1b542] selection:text-black pb-10 bg-vault-dark">
       {/* Toast, Modals, Header... (Keep existing) */}
-      {toast && <div className="fixed top-20 right-4 z-[100] bg-[#232a3a] border border-amber-500 text-white px-4 py-3 rounded shadow-xl"><RenderIcon name="Zap" size={16} className="text-amber-500" /> <span className="text-sm font-bold">{toast.msg}</span></div>}
+      {toast && <div className="fixed top-20 right-4 z-50 bg-[#232a3a] border border-amber-500 text-white px-4 py-3 rounded shadow-xl"><RenderIcon name="Zap" size={16} className="text-amber-500" /> <span className="text-sm font-bold">{toast.msg}</span></div>}
       
       {/* Modals: Pack Opening (uses local state set by the handleUseItem wrapper) */}
       {packOpening && (
@@ -601,7 +613,7 @@ const colors = {
                     {editMode && (
                        <div className="bg-[#1e1e1e] border border-slate-700 rounded-lg p-2 flex gap-2 mr-4 items-center shadow-xl animate-in fade-in zoom-in">
                           <div className="text-xs font-bold text-slate-400 px-2 uppercase tracking-wider border-r border-slate-700 mr-1">Interface Config</div>
-                          {['daily_ops', 'contract', 'skills', 'shop', 'productivity_timer'].map(k => (
+                          {['daily_ops', 'contract', 'skills', 'shop', 'productivity_timer', 'task_command_center'].map(k => (
                              <button key={k} onClick={() => toggleWidgetConfig(k)} className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${data.widgetConfig[k] ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>{k.replace('_',' ')}</button>
                           ))}
                        </div>

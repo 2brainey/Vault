@@ -130,7 +130,7 @@ export const MasteryModal = ({ skill, onClose, onClaimReward, claimedLevels }) =
                         <p className="text-sm text-slate-400">{unlock.desc}</p>
                       </div>
                       {hasReward && (
-                          <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border ml-4 ${isUnlocked ? 'bg-black/40 border-slate-600' : 'bg-black/20 border-slate-800'}`}>
+                          <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border ml-4 ${isClaimable ? 'bg-black/40 border-slate-600' : 'bg-black/20 border-slate-800'}`}>
                               <div className={`p-1.5 rounded ${isClaimable ? 'bg-amber-500/20 text-amber-500' : isClaimed ? 'bg-emerald-500/20 text-emerald-500' : 'bg-slate-800 text-slate-600'}`}>
                                   <RenderIcon name={unlock.reward.icon} size={16} />
                               </div>
@@ -291,13 +291,266 @@ export const InventoryGrid = ({ slots: inventory, mp, onUseItem, onDragStart, on
 };
 
 
-// ... (rest of the file: WellnessBar, ContractWidget, CollectionBinder, etc.)
-// ... (The rest of the component exports are unchanged)
-// ...
-// ... (Make sure to remove the old InventoryGrid block and keep the rest of the original file)
-// ...
+// --- CARD COLLECTION BINDER ---
 
-export const WellnessBar = ({ label, value, iconName, onFill, color, tasks }) => {
-  // ...
-  // (keep the rest of the file contents)
+// Helper function to map card IDs to full card objects and count duplicates
+const mapAndCountCards = (cardIds) => {
+    const cardMap = {};
+    let totalValue = 0;
+    
+    cardIds.forEach(id => {
+        const cardData = CARD_DATABASE.find(c => c.id === id);
+        if (cardData) {
+            if (!cardMap[id]) {
+                cardMap[id] = { ...cardData, count: 0, duplicates: 0, totalValue: 0 };
+            }
+            cardMap[id].count++;
+            
+            // Track duplicates and their value for mass sale
+            if (cardMap[id].count > 1) {
+                cardMap[id].duplicates++;
+                cardMap[id].totalValue += cardData.value;
+                totalValue += cardData.value;
+            }
+        }
+    });
+
+    const uniqueCards = Object.values(cardMap).sort((a, b) => {
+        const rarityOrder = ['Legendary', 'Epic', 'Rare', 'Uncommon', 'Common'];
+        return rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity);
+    });
+
+    return { uniqueCards, totalValue };
+};
+
+const CardItem = ({ card, onSell }) => {
+    const rarityColor = getRarityColor(card.rarity);
+
+    return (
+        <div className={`aspect-[2/3] rounded-xl border-2 flex flex-col items-center justify-center relative p-2 ${getRarityGradient(card.rarity)}`}>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-1 ${rarityColor.replace('text', 'bg').replace('/20', '/30')}`}>
+                <RenderIcon name={card.iconName} size={20} className={rarityColor} />
+            </div>
+            <h4 className="text-xs font-bold text-white text-center leading-tight truncate w-full px-1">{card.name}</h4>
+            <div className="text-[8px] uppercase text-slate-400 mt-0.5">{card.rarity}</div>
+            <div className="absolute top-1 right-1 text-[8px] font-mono font-bold px-1 rounded bg-black/50 text-emerald-400">
+                {card.value} DSC
+            </div>
+            {card.count > 1 && (
+                <div className="absolute bottom-1 left-1 bg-black/50 text-white text-[10px] font-mono px-1 rounded-full">
+                    x{card.count}
+                </div>
+            )}
+            
+            {card.duplicates > 0 && (
+                <button 
+                    onClick={() => onSell(card.id, card.value)} 
+                    className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center opacity-0 hover:opacity-100 transition-opacity rounded-xl"
+                    title={`Sell 1 duplicate for ${card.value} DSC`}
+                >
+                    <RenderIcon name="DollarSign" size={16} className="text-emerald-400 animate-pulse"/>
+                    <span className="text-[9px] font-bold text-emerald-400 mt-1">Sell Dupe</span>
+                </button>
+            )}
+        </div>
+    );
+};
+
+export const CollectionBinder = ({ cards, onSell, onSellAll }) => {
+    const [currentPage, setCurrentPage] = useState(1);
+    const { uniqueCards, totalValue: totalDupeValue } = useMemo(() => mapAndCountCards(cards), [cards]);
+    const totalPages = Math.ceil(uniqueCards.length / CARDS_PER_PAGE);
+
+    const startIndex = (currentPage - 1) * CARDS_PER_PAGE;
+    const currentCards = uniqueCards.slice(startIndex, startIndex + CARDS_PER_PAGE);
+
+    const handleNext = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
+    const handlePrev = () => setCurrentPage(prev => Math.max(prev - 1, 1));
+    
+    const duplicateCount = uniqueCards.reduce((sum, card) => sum + card.duplicates, 0);
+
+    return (
+        <div className="flex flex-col h-full">
+            <div className="flex justify-between items-center mb-4 shrink-0">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2"><RenderIcon name="Tag" className="text-purple-400"/> Card Collection</h2>
+                <div className="flex items-center gap-3">
+                    {duplicateCount > 0 && (
+                        <button 
+                            onClick={() => onSellAll({ count: duplicateCount, value: totalDupeValue })}
+                            className="px-3 py-1 bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-400 text-xs font-bold rounded-lg border border-emerald-800 transition-colors flex items-center gap-2"
+                        >
+                            <RenderIcon name="Coins" size={14}/> Sell {duplicateCount} Duplicates ({totalDupeValue} DSC)
+                        </button>
+                    )}
+                    <div className="text-xs font-mono text-slate-400">Total: {cards.length}</div>
+                </div>
+            </div>
+
+            {uniqueCards.length > 0 ? (
+                <>
+                    <div className="grid grid-cols-4 gap-4 flex-1 mb-4">
+                        {currentCards.map(card => (
+                            <CardItem key={card.id} card={card} onSell={onSell} />
+                        ))}
+                        {[...Array(CARDS_PER_PAGE - currentCards.length)].map((_, i) => (
+                             <div key={`empty-${i}`} className="aspect-[2/3] rounded-xl border border-slate-800/50 border-dashed bg-[#1a1a1a] flex items-center justify-center opacity-50">
+                                <RenderIcon name="Circle" size={20} className="text-slate-700"/>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="flex justify-between items-center shrink-0">
+                        <button onClick={handlePrev} disabled={currentPage === 1} className="p-2 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white">
+                            <RenderIcon name="ArrowLeft" size={16}/>
+                        </button>
+                        <span className="text-xs text-slate-400 font-mono">Page {currentPage} / {totalPages}</span>
+                        <button onClick={handleNext} disabled={currentPage === totalPages} className="p-2 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white">
+                            <RenderIcon name="ArrowRight" size={16}/>
+                        </button>
+                    </div>
+                </>
+            ) : (
+                <div className="flex flex-col items-center justify-center h-full text-slate-500 border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900/20">
+                    <RenderIcon name="Package" size={48} className="mb-4 opacity-50" />
+                    <p>Your binder is empty. Buy a pack from the shop!</p>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// --- COMPONENT: WELLNESS BAR (RESTORATION) ---
+export const WellnessBar = ({ label, value, iconName, onFill, color, task }) => {
+  const progressPercent = Math.max(0, Math.min(100, value));
+  
+  return (
+    <div className="bg-[#131313] p-3 rounded-lg border border-slate-700 flex flex-col hover:border-blue-500/50 transition-colors">
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center gap-2">
+          <div className={`p-1 rounded-md ${color.replace('bg', 'text')}`}><RenderIcon name={iconName} size={16} /></div>
+          <h4 className="text-xs font-bold text-white">{label}</h4>
+        </div>
+        <span className="text-xs font-mono text-white">{value}%</span>
+      </div>
+      <div className="h-2 w-full bg-black rounded-full overflow-hidden border border-slate-700 relative">
+        <div className={`h-full ${color} transition-all duration-300`} style={{ width: `${progressPercent}%` }}></div>
+      </div>
+      <div className="flex justify-between items-center mt-2">
+        <span className="text-[10px] text-slate-500 italic flex items-center gap-1"><RenderIcon name="CheckCircle" size={10} className="text-emerald-500" /> Complete: {task}</span>
+        <button 
+          onClick={onFill} 
+          disabled={value >= 100}
+          className="text-[9px] font-bold px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors"
+        >
+          FILL +20
+        </button>
+      </div>
+    </div>
+  );
+};
+
+
+// --- PLACEHOLDER EXPORTS (RESTORED from original file structure) ---
+
+export const ContractWidget = ({ contracts, onToggle, title, questFilter, setQuestFilter }) => {
+  const displayContracts = contracts || [];
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.ceil(displayContracts.length / CONTRACTS_PER_PAGE);
+
+  const startIndex = (currentPage - 1) * CONTRACTS_PER_PAGE;
+  const currentContracts = displayContracts.slice(startIndex, startIndex + CONTRACTS_PER_PAGE);
+
+  const handleNext = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  const handlePrev = () => setCurrentPage(prev => Math.max(prev - 1, 1));
+
+  if (displayContracts.length === 0) {
+    return <div className="text-slate-500 text-xs italic p-4">No contracts to show. Time for a vacation.</div>;
+  }
+
+  return (
+    <div className="flex flex-col p-4">
+      {/* Contract List */}
+      <div className="space-y-3 flex-1 min-h-[150px]">
+        {currentContracts.map((contract) => (
+          <div key={contract.id} className={`flex items-center justify-between p-3 rounded-lg border transition-all ${contract.completed ? 'bg-emerald-900/20 border-emerald-700' : 'bg-slate-800/50 border-slate-700 hover:border-amber-500'}`}>
+            <div className="flex-1 min-w-0">
+              <h4 className={`text-xs font-bold leading-tight ${contract.completed ? 'text-emerald-400 line-through' : 'text-white'}`}>{contract.title}</h4>
+              <p className="text-[10px] text-slate-400 mt-0.5 truncate">{contract.desc}</p>
+              <div className="text-[9px] font-mono font-bold text-slate-500 mt-1">+{contract.xp} XP</div>
+            </div>
+            <button
+              onClick={() => onToggle(contract.id)}
+              className={`ml-3 px-2 py-1 rounded text-[9px] font-bold whitespace-nowrap transition-colors ${contract.completed ? 'bg-red-800/50 text-red-400 hover:bg-red-700/50' : 'bg-amber-500 hover:bg-amber-400 text-black'}`}
+            >
+              {contract.completed ? 'Reset' : 'Complete'}
+            </button>
+          </div>
+        ))}
+      </div>
+      
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center mt-4">
+            <button onClick={handlePrev} disabled={currentPage === 1} className="p-2 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white">
+                <RenderIcon name="ArrowLeft" size={12}/>
+            </button>
+            <span className="text-[10px] text-slate-400">Page {currentPage} / {totalPages}</span>
+            <button onClick={handleNext} disabled={currentPage === totalPages} className="p-2 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white">
+                <RenderIcon name="ArrowRight" size={12}/>
+            </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const AssetBar = ({ label, value, total, color }) => {
+  const percentage = total > 0 ? (value / total) * 100 : 0;
+  return (
+      <div className="space-y-1">
+          <div className="flex justify-between text-[10px] text-slate-400">
+              <span>{label}</span>
+              <span className="text-white font-mono">{value.toLocaleString()}</span>
+          </div>
+          <div className="h-1.5 w-full bg-black rounded-full overflow-hidden">
+              <div className="h-full rounded-full" style={{ width: `${percentage}%`, backgroundColor: color }}></div>
+          </div>
+      </div>
+  );
+};
+
+export const InputGroup = ({ title, children }) => (
+    <div className="mb-8 p-4 bg-[#1a1a1a] rounded-lg border border-slate-700">
+        <h3 className="text-xs font-bold uppercase text-amber-500 mb-4 pb-2 border-b border-slate-700">{title}</h3>
+        <div className="space-y-4">
+            {children}
+        </div>
+    </div>
+);
+
+export const InputField = ({ label, value, onChange }) => (
+    <div className="flex flex-col">
+        <label className="text-xs text-slate-400 mb-1">{label}</label>
+        <input 
+            type="number"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="bg-black/50 border border-slate-700 rounded p-2 text-sm text-white focus:ring-amber-500 focus:border-amber-500 transition-all"
+        />
+    </div>
+);
+
+export const SkillDetailModal = ({ skill, onClose }) => {
+    return (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+            <div className="bg-[#1a1a1a] border border-slate-700 w-full max-w-md rounded-xl p-6 shadow-2xl">
+                <div className="flex justify-between items-center border-b border-slate-700 pb-3 mb-4">
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2"><RenderIcon name={skill.icon} className={skill.color}/> {skill.name} Mastery</h2>
+                    <button onClick={onClose} className="text-slate-400 hover:text-white"><RenderIcon name="X" size={20}/></button>
+                </div>
+                <p className="text-sm text-slate-400 mb-4">{skill.desc}</p>
+                <div className="text-xs text-slate-300">Detailed stats and unlock path to be implemented here.</div>
+            </div>
+        </div>
+    );
 };

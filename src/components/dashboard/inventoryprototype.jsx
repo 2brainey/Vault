@@ -22,7 +22,8 @@ import {
 
 // --- Imports for the consolidated logic ---
 // NOTE: These were previously local inline constants/components
-import { InventoryGrid, CollectionBinder } from './dashboardui'; // <-- IMPORT CONSOLIDATED GRID AND BINDER
+// FIX: Ensure both InventoryGrid and CollectionBinder are imported from dashboardui
+import { InventoryGrid, CollectionBinder } from './dashboardui.jsx'; 
 import { RenderIcon } from './dashboardutils'; 
 import { INVENTORY_SLOTS, CARD_DATABASE } from '../../data/gamedata'; 
 
@@ -115,7 +116,7 @@ export default function InventoryView({
       const sourceSlots = sourceContainerId === 'inventory' ? safeInventory : safeBank;
       const targetSlots = targetContainerId === 'inventory' ? safeInventory : safeBank;
       const setSource = sourceContainerId === 'inventory' ? onUpdateInventory : onUpdateBank;
-      const setTarget = targetContainerId === 'inventory' ? onUpdateInventory : onUpdateBank;
+      const setTarget = targetContainerId === 'inventory' ? onUpdateBank : onUpdateInventory;
 
       if (sourceContainerId === targetContainerId) {
           const newSlots = [...sourceSlots];

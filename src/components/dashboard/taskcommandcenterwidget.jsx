@@ -12,10 +12,11 @@ const TaskCommandCenterWidget = ({ onLaunchBoard }) => {
   const goldAccent = { color: colors.gold, textShadow: `0 0 8px ${colors.gold}80` };
 
   // --- STATE ---
+  // FIX: Ensure 'useState' is capitalized correctly
   const [newKanbanInput, setNewKanbanInput] = useState('');
   const [newKanbanTag, setNewKanbanTag] = useState('Code');
   
-  // Mock Data - In a real app, pass this as props or fetch from API
+  // Mock Data
   const [kanbanTasks, setKanbanTasks] = useState([
     { id: 1, title: 'Design Vault Logo', status: 'done', tag: 'Design' },
     { id: 2, title: 'Code Drag & Drop Logic', status: 'in-progress', tag: 'Code' },

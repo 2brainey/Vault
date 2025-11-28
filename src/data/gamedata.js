@@ -336,7 +336,7 @@ export const SHOP_ITEMS = {
 
 export const ESTATE_ROOMS = [
     // SPECIAL / EXPANSION
-    { id: 'expansion', name: 'Land Expansion', cost: 25000, icon: 'Expand', desc: 'Expand estate borders (+1 Row/Col)', type: 'Special', isExpansion: true },
+    { id: 'expansion', name: 'Land Expansion', cost: 25000, icon: 'Expand', desc: `Expands grid to ${MAX_GRID_DIMENSION}x${MAX_GRID_DIMENSION} max`, type: 'Special', isExpansion: true },
     { id: 'plot_deed', name: 'Plot Deed', cost: PLOT_COST, icon: 'Map', desc: 'Claim a single plot of land', type: 'Special', isDeed: true },
     
     // BUNDLES
@@ -458,10 +458,11 @@ export const initialData = {
     mastery_log_widget: true, // Force standalone widget visible
     mastery_log_btn: true, // Force button widget visible
     productivity_timer: true,
+    task_command_center: true, // NEW WIDGET
   },
   layout: {
     home: {
-        left: ['daily_ops', 'contract', 'productivity_timer'], 
+        left: ['daily_ops', 'contract', 'productivity_timer', 'task_command_center'], // PLACED IN LEFT COLUMN
         right: ['shop', 'skills'] 
     },
     // UPDATED: Add mastery_log_widget to a column for initial display
