@@ -108,13 +108,41 @@ const colors = {
   };
   
   const toggleWidget = (key) => {
-    updateData(prev => ({ 
-        ...prev,
-        widgetConfig: { 
+    updateData(prev => {
+        // 1. Determine the new visibility state
+        const isCurrentlyEnabled = prev.widgetConfig?.[key];
+        const newConfig = {
             ...prev.widgetConfig,
-            [key]: !prev.widgetConfig?.[key] 
+            [key]: !isCurrentlyEnabled // Flip the toggle
+        };
+        
+        let newLayout = prev.layout;
+
+        // 2. PLACEMENT CHECK: If we are TURNING THE WIDGET ON (setting to true)
+        // AND it's a home widget that isn't placed yet, inject it.
+        if (!isCurrentlyEnabled && ['daily_ops', 'contract', 'skills', 'shop', 'productivity_timer'].includes(key)) {
+            
+            // Check if the widget exists in EITHER the left or right home column
+            const isPlaced = newLayout.home.left.includes(key) || newLayout.home.right.includes(key);
+
+            if (!isPlaced) {
+                // Force inject the widget into the leftmost column
+                newLayout = {
+                    ...newLayout,
+                    home: {
+                        ...newLayout.home,
+                        // Append the key to the end of the left column list
+                        left: [...newLayout.home.left, key] 
+                    }
+                };
+            }
         }
-    }));
+
+        return { 
+            widgetConfig: newConfig,
+            layout: newLayout
+        };
+    });
   };
 
   // --- DRAG & DROP LOGIC (Relies on store's updateData) ---
@@ -472,7 +500,7 @@ const colors = {
 
   // --- RENDER MAIN ---
   return (
-    <div className="min-h-screen text-slate-200 font-sans selection:bg-[#e1b542] selection:text-black pb-10" style={{ backgroundColor: colors.bg }}>
+    <div className="min-h-screen text-slate-200 font-sans selection:bg-[#e1b542] selection:text-black pb-10 bg-vault-dark">
       {/* Toast, Modals, Header... (Keep existing) */}
       {toast && <div className="fixed top-20 right-4 z-[100] bg-[#232a3a] border border-amber-500 text-white px-4 py-3 rounded shadow-xl"><RenderIcon name="Zap" size={16} className="text-amber-500" /> <span className="text-sm font-bold">{toast.msg}</span></div>}
       
@@ -573,7 +601,7 @@ const colors = {
                     {editMode && (
                        <div className="bg-[#1e1e1e] border border-slate-700 rounded-lg p-2 flex gap-2 mr-4 items-center shadow-xl animate-in fade-in zoom-in">
                           <div className="text-xs font-bold text-slate-400 px-2 uppercase tracking-wider border-r border-slate-700 mr-1">Interface Config</div>
-                          {['daily_ops', 'contract', 'skills', 'shop'].map(k => (
+                          {['daily_ops', 'contract', 'skills', 'shop', 'productivity_timer'].map(k => (
                              <button key={k} onClick={() => toggleWidgetConfig(k)} className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${data.widgetConfig[k] ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>{k.replace('_',' ')}</button>
                           ))}
                        </div>

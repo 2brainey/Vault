@@ -8,10 +8,9 @@ export default {
   ],
   theme: {
     extend: {
-      colors: { // <-- ADD THIS BLOCK
+      colors: { // <-- NEW CUSTOM COLOR PALETTE
         'vault-dark': '#2b3446',
         'vault-slate': '#404e6d',
-        'vault-border': '#404e6d',
         'vault-amber': '#e1b542',
         'vault-bronze': '#78643e',
         'vault-success': '#4ade80',
