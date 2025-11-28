@@ -1,15 +1,14 @@
-// 2brainey/vault/Vault-afa4cc999fa2737b63c2f45c68edbd0523c4440e/src/components/dashboard/dashboardui.jsx
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     CheckCircle, Circle, ArrowRight, ArrowLeft, 
-    HelpCircle, Lock as LockIcon, X, Trophy, Sparkles, Gift
+    HelpCircle, Lock as LockIcon, X, Trophy, Sparkles, Gift,
+    Briefcase, DollarSign, Coins, Package, Tag, List
 } from 'lucide-react'; 
 
 import { CARD_DATABASE, CONTRACTS_PER_PAGE, CARDS_PER_PAGE, SKILL_DETAILS, INVENTORY_SLOTS } from '../../data/gamedata';
 import { RenderIcon, getRarityGradient, getRarityColor, getXpRequiredForLevel } from './dashboardutils'; 
 
-// --- NEW COMPONENT: SKILL CARD ---
+// Find the original SkillCard in src/components/dashboard/dashboardui.jsx and replace it with this version.
 export const SkillCard = ({ skill, onItemClick, totalXP }) => {
   const details = SKILL_DETAILS[skill.id] || { 
     name: skill.id.toUpperCase(), icon: "Star", color: "text-slate-400", desc: "Generic Skill", unlocks: [] 
@@ -25,7 +24,8 @@ export const SkillCard = ({ skill, onItemClick, totalXP }) => {
 
   return (
     <div 
-      onClick={() => onItemClick({ ...details, level: currentLevel, currentXP, xpForNext, id: skill.id })}
+      // UPDATED: Ensure correct data is passed for modal (now uses currentXP, not just totalXP)
+      onClick={() => onItemClick({ ...details, level: currentLevel, currentXP, xpForNext, id: skill.id, currentXP: totalXP })} 
       className="group relative bg-[#1e1e1e] border border-slate-700 hover:border-amber-500 rounded-lg p-2 cursor-pointer transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl"
     >
       <div className="flex items-center gap-2">
@@ -62,8 +62,8 @@ export const SkillCard = ({ skill, onItemClick, totalXP }) => {
     </div>
   );
 };
+// ... (rest of dashboardui.jsx)
 
-// --- NEW COMPONENT: MASTERY MODAL ---
 export const MasteryModal = ({ skill, onClose, onClaimReward, claimedLevels }) => {
     if (!skill) return null;
     const progressToMax = (skill.level || 0) / 99 * 100;
@@ -162,15 +162,14 @@ const CheckCircleIcon = () => (
   </svg>
 );
 
-// --- DEDICATED MASTERY LOG WIDGET ---
 export const MasteryLogWidget = ({ playerSkills, totalXPs, onItemClick }) => (
-    <div className="flex flex-col w-full"> 
+    <div className="flex flex-col w-full h-full"> 
         <div className="flex justify-between items-center mb-3 border-b border-slate-700 pb-2 shrink-0">
             <div className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                 <RenderIcon name="Scroll" size={14} className="text-amber-500"/> Skill Mastery Overview
             </div>
         </div>
-        <div className="grid grid-cols-2 gap-2 p-2 bg-[#131313] rounded border border-slate-800 overflow-y-auto custom-scrollbar max-h-[340px]">
+        <div className="grid grid-cols-2 gap-2 p-2 bg-[#131313] rounded border border-slate-800 overflow-y-auto custom-scrollbar flex-1">
             {playerSkills && playerSkills.length > 0 ? (
                 playerSkills.map((skill) => (
                     <SkillCard key={skill.id} skill={skill} onItemClick={onItemClick} totalXP={totalXPs[skill.id]} />
@@ -182,9 +181,6 @@ export const MasteryLogWidget = ({ playerSkills, totalXPs, onItemClick }) => (
     </div>
 );
 
-// --- ADVANCED InventoryGrid (CONSOLIDATED FROM INVENTORYPROTOTYPE.JSX) ---
-
-// Helper needed locally in this scope
 const getRarityTextColor = (rarity) => {
   switch(rarity) {
       case 'Legendary': return 'text-amber-400';
@@ -197,8 +193,6 @@ const getRarityTextColor = (rarity) => {
 
 export const InventoryGrid = ({ slots: inventory, mp, onUseItem, onDragStart, onDrop, onContextMenu, containerId }) => {
   const [tooltip, setTooltip] = useState(null);
-
-  // Defensive check for slots
   const safeSlots = Array.isArray(inventory) ? inventory : new Array(28).fill(null);
 
   const handleMouseEnter = (e, item) => {
@@ -229,7 +223,6 @@ export const InventoryGrid = ({ slots: inventory, mp, onUseItem, onDragStart, on
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header Pouch - Only show for Inventory */}
       {containerId === 'inventory' && (
         <div className="flex justify-between items-center p-2 bg-[#131313] border border-slate-800 rounded shrink-0 mb-3">
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-400"><RenderIcon name="Coins" size={14}/> Discipline Pouch</div>
@@ -237,7 +230,7 @@ export const InventoryGrid = ({ slots: inventory, mp, onUseItem, onDragStart, on
         </div>
       )}
 
-      <div className={`grid ${containerId === 'bank' ? 'grid-cols-5' : 'grid-cols-4'} gap-2 p-2 overflow-y-auto custom-scrollbar flex-1`}>
+      <div className={`grid ${containerId === 'bank' ? 'grid-cols-5' : 'grid-cols-4'} gap-2 p-2 overflow-y-auto custom-scrollbar flex-1 content-start`}>
           {safeSlots.map((item, i) => (
               <div 
                 key={i} 
@@ -290,14 +283,9 @@ export const InventoryGrid = ({ slots: inventory, mp, onUseItem, onDragStart, on
   );
 };
 
-
-// --- CARD COLLECTION BINDER ---
-
-// Helper function to map card IDs to full card objects and count duplicates
 const mapAndCountCards = (cardIds) => {
     const cardMap = {};
     let totalValue = 0;
-    
     cardIds.forEach(id => {
         const cardData = CARD_DATABASE.find(c => c.id === id);
         if (cardData) {
@@ -305,8 +293,6 @@ const mapAndCountCards = (cardIds) => {
                 cardMap[id] = { ...cardData, count: 0, duplicates: 0, totalValue: 0 };
             }
             cardMap[id].count++;
-            
-            // Track duplicates and their value for mass sale
             if (cardMap[id].count > 1) {
                 cardMap[id].duplicates++;
                 cardMap[id].totalValue += cardData.value;
@@ -314,18 +300,15 @@ const mapAndCountCards = (cardIds) => {
             }
         }
     });
-
     const uniqueCards = Object.values(cardMap).sort((a, b) => {
         const rarityOrder = ['Legendary', 'Epic', 'Rare', 'Uncommon', 'Common'];
         return rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity);
     });
-
     return { uniqueCards, totalValue };
 };
 
 const CardItem = ({ card, onSell }) => {
     const rarityColor = getRarityColor(card.rarity);
-
     return (
         <div className={`aspect-[2/3] rounded-xl border-2 flex flex-col items-center justify-center relative p-2 ${getRarityGradient(card.rarity)}`}>
             <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-1 ${rarityColor.replace('text', 'bg').replace('/20', '/30')}`}>
@@ -341,13 +324,8 @@ const CardItem = ({ card, onSell }) => {
                     x{card.count}
                 </div>
             )}
-            
             {card.duplicates > 0 && (
-                <button 
-                    onClick={() => onSell(card.id, card.value)} 
-                    className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center opacity-0 hover:opacity-100 transition-opacity rounded-xl"
-                    title={`Sell 1 duplicate for ${card.value} DSC`}
-                >
+                <button onClick={() => onSell(card.id, card.value)} className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center opacity-0 hover:opacity-100 transition-opacity rounded-xl" title={`Sell 1 duplicate for ${card.value} DSC`}>
                     <RenderIcon name="DollarSign" size={16} className="text-emerald-400 animate-pulse"/>
                     <span className="text-[9px] font-bold text-emerald-400 mt-1">Sell Dupe</span>
                 </button>
@@ -360,13 +338,10 @@ export const CollectionBinder = ({ cards, onSell, onSellAll }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const { uniqueCards, totalValue: totalDupeValue } = useMemo(() => mapAndCountCards(cards), [cards]);
     const totalPages = Math.ceil(uniqueCards.length / CARDS_PER_PAGE);
-
     const startIndex = (currentPage - 1) * CARDS_PER_PAGE;
     const currentCards = uniqueCards.slice(startIndex, startIndex + CARDS_PER_PAGE);
-
     const handleNext = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
     const handlePrev = () => setCurrentPage(prev => Math.max(prev - 1, 1));
-    
     const duplicateCount = uniqueCards.reduce((sum, card) => sum + card.duplicates, 0);
 
     return (
@@ -375,20 +350,16 @@ export const CollectionBinder = ({ cards, onSell, onSellAll }) => {
                 <h2 className="text-xl font-bold text-white flex items-center gap-2"><RenderIcon name="Tag" className="text-purple-400"/> Card Collection</h2>
                 <div className="flex items-center gap-3">
                     {duplicateCount > 0 && (
-                        <button 
-                            onClick={() => onSellAll({ count: duplicateCount, value: totalDupeValue })}
-                            className="px-3 py-1 bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-400 text-xs font-bold rounded-lg border border-emerald-800 transition-colors flex items-center gap-2"
-                        >
+                        <button onClick={() => onSellAll({ count: duplicateCount, value: totalDupeValue })} className="px-3 py-1 bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-400 text-xs font-bold rounded-lg border border-emerald-800 transition-colors flex items-center gap-2">
                             <RenderIcon name="Coins" size={14}/> Sell {duplicateCount} Duplicates ({totalDupeValue} DSC)
                         </button>
                     )}
                     <div className="text-xs font-mono text-slate-400">Total: {cards.length}</div>
                 </div>
             </div>
-
             {uniqueCards.length > 0 ? (
                 <>
-                    <div className="grid grid-cols-4 gap-4 flex-1 mb-4">
+                    <div className="grid grid-cols-4 gap-4 flex-1 mb-4 content-start">
                         {currentCards.map(card => (
                             <CardItem key={card.id} card={card} onSell={onSell} />
                         ))}
@@ -398,7 +369,6 @@ export const CollectionBinder = ({ cards, onSell, onSellAll }) => {
                             </div>
                         ))}
                     </div>
-
                     <div className="flex justify-between items-center shrink-0">
                         <button onClick={handlePrev} disabled={currentPage === 1} className="p-2 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white">
                             <RenderIcon name="ArrowLeft" size={16}/>
@@ -419,10 +389,8 @@ export const CollectionBinder = ({ cards, onSell, onSellAll }) => {
     );
 };
 
-// --- COMPONENT: WELLNESS BAR (RESTORATION) ---
 export const WellnessBar = ({ label, value, iconName, onFill, color, task }) => {
   const progressPercent = Math.max(0, Math.min(100, value));
-  
   return (
     <div className="bg-[#131313] p-3 rounded-lg border border-slate-700 flex flex-col hover:border-blue-500/50 transition-colors">
       <div className="flex justify-between items-center mb-2">
@@ -437,67 +405,67 @@ export const WellnessBar = ({ label, value, iconName, onFill, color, task }) => 
       </div>
       <div className="flex justify-between items-center mt-2">
         <span className="text-[10px] text-slate-500 italic flex items-center gap-1"><RenderIcon name="CheckCircle" size={10} className="text-emerald-500" /> Complete: {task}</span>
-        <button 
-          onClick={onFill} 
-          disabled={value >= 100}
-          className="text-[9px] font-bold px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors"
-        >
-          FILL +20
-        </button>
+        <button onClick={onFill} disabled={value >= 100} className="text-[9px] font-bold px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors">FILL +20</button>
       </div>
     </div>
   );
 };
 
-
-// --- PLACEHOLDER EXPORTS (RESTORED from original file structure) ---
-
-export const ContractWidget = ({ contracts, onToggle, title, questFilter, setQuestFilter }) => {
-  const displayContracts = contracts || [];
+export const ContractWidget = ({ contracts, onToggle }) => {
+  const allContracts = contracts || [];
+  const [filter, setFilter] = useState('active'); // 'active' | 'completed'
   const [currentPage, setCurrentPage] = useState(1);
-  const totalPages = Math.ceil(displayContracts.length / CONTRACTS_PER_PAGE);
 
+  const filteredContracts = useMemo(() => {
+    return allContracts.filter(c => 
+        filter === 'active' ? !c.completed : c.completed
+    ).sort((a, b) => b.xp - a.xp);
+  }, [allContracts, filter]);
+
+  const totalPages = Math.ceil(filteredContracts.length / CONTRACTS_PER_PAGE);
   const startIndex = (currentPage - 1) * CONTRACTS_PER_PAGE;
-  const currentContracts = displayContracts.slice(startIndex, startIndex + CONTRACTS_PER_PAGE);
+  const currentContracts = filteredContracts.slice(startIndex, startIndex + CONTRACTS_PER_PAGE);
 
   const handleNext = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
   const handlePrev = () => setCurrentPage(prev => Math.max(prev - 1, 1));
-
-  if (displayContracts.length === 0) {
-    return <div className="text-slate-500 text-xs italic p-4">No contracts to show. Time for a vacation.</div>;
-  }
+  
+  useEffect(() => { setCurrentPage(1); }, [filter]);
 
   return (
-    <div className="flex flex-col p-4">
-      {/* Contract List */}
-      <div className="space-y-3 flex-1 min-h-[150px]">
-        {currentContracts.map((contract) => (
-          <div key={contract.id} className={`flex items-center justify-between p-3 rounded-lg border transition-all ${contract.completed ? 'bg-emerald-900/20 border-emerald-700' : 'bg-slate-800/50 border-slate-700 hover:border-amber-500'}`}>
+    <div className="flex flex-col p-4 bg-[#1e1e1e] rounded-xl border border-slate-700 h-full">
+      <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <RenderIcon name="Briefcase" size={16} className="text-amber-500"/> Contracts
+          </h3>
+          <div className="flex bg-black/40 rounded p-1">
+              <button onClick={() => setFilter('active')} className={`px-3 py-1 text-[10px] uppercase font-bold rounded transition-colors ${filter === 'active' ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white'}`}>Active</button>
+              <button onClick={() => setFilter('completed')} className={`px-3 py-1 text-[10px] uppercase font-bold rounded transition-colors ${filter === 'completed' ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:text-white'}`}>Done</button>
+          </div>
+      </div>
+      <div className="space-y-3 flex-1 min-h-[200px]">
+        {currentContracts.length > 0 ? currentContracts.map((contract) => (
+          <div key={contract.id} className={`flex items-center justify-between p-3 rounded-lg border transition-all ${contract.completed ? 'bg-emerald-900/10 border-emerald-800 opacity-70' : 'bg-slate-800/50 border-slate-700 hover:border-amber-500'}`}>
             <div className="flex-1 min-w-0">
               <h4 className={`text-xs font-bold leading-tight ${contract.completed ? 'text-emerald-400 line-through' : 'text-white'}`}>{contract.title}</h4>
               <p className="text-[10px] text-slate-400 mt-0.5 truncate">{contract.desc}</p>
               <div className="text-[9px] font-mono font-bold text-slate-500 mt-1">+{contract.xp} XP</div>
             </div>
-            <button
-              onClick={() => onToggle(contract.id)}
-              className={`ml-3 px-2 py-1 rounded text-[9px] font-bold whitespace-nowrap transition-colors ${contract.completed ? 'bg-red-800/50 text-red-400 hover:bg-red-700/50' : 'bg-amber-500 hover:bg-amber-400 text-black'}`}
-            >
-              {contract.completed ? 'Reset' : 'Complete'}
+            <button onClick={() => onToggle(contract.id)} className={`ml-3 px-2 py-1 rounded text-[9px] font-bold whitespace-nowrap transition-colors ${contract.completed ? 'bg-slate-700 text-slate-400 hover:bg-red-900/50 hover:text-red-400 shadow-none' : 'bg-amber-500 hover:bg-amber-400 text-black shadow-lg shadow-amber-900/20'}`}>
+              {contract.completed ? 'Undo' : 'Finish'}
             </button>
           </div>
-        ))}
+        )) : (
+            <div className="flex flex-col items-center justify-center h-40 text-slate-500 border-2 border-dashed border-slate-800 rounded-lg">
+                <RenderIcon name={filter === 'active' ? "Circle" : "CheckCircle"} size={24} className="mb-2 opacity-50"/>
+                <p className="text-xs">No {filter} contracts.</p>
+            </div>
+        )}
       </div>
-      
-      {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex justify-between items-center mt-4">
-            <button onClick={handlePrev} disabled={currentPage === 1} className="p-2 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white">
-                <RenderIcon name="ArrowLeft" size={12}/>
-            </button>
-            <span className="text-[10px] text-slate-400">Page {currentPage} / {totalPages}</span>
-            <button onClick={handleNext} disabled={currentPage === totalPages} className="p-2 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white">
-                <RenderIcon name="ArrowRight" size={12}/>
-            </button>
+        <div className="flex justify-between items-center mt-4 pt-2 border-t border-slate-800">
+            <button onClick={handlePrev} disabled={currentPage === 1} className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-white"><RenderIcon name="ArrowLeft" size={12}/></button>
+            <span className="text-[10px] text-slate-400 font-mono">Page {currentPage} / {totalPages}</span>
+            <button onClick={handleNext} disabled={currentPage === totalPages} className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-white"><RenderIcon name="ArrowRight" size={12}/></button>
         </div>
       )}
     </div>
@@ -522,35 +490,26 @@ export const AssetBar = ({ label, value, total, color }) => {
 export const InputGroup = ({ title, children }) => (
     <div className="mb-8 p-4 bg-[#1a1a1a] rounded-lg border border-slate-700">
         <h3 className="text-xs font-bold uppercase text-amber-500 mb-4 pb-2 border-b border-slate-700">{title}</h3>
-        <div className="space-y-4">
-            {children}
-        </div>
+        <div className="space-y-4">{children}</div>
     </div>
 );
 
 export const InputField = ({ label, value, onChange }) => (
     <div className="flex flex-col">
         <label className="text-xs text-slate-400 mb-1">{label}</label>
-        <input 
-            type="number"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className="bg-black/50 border border-slate-700 rounded p-2 text-sm text-white focus:ring-amber-500 focus:border-amber-500 transition-all"
-        />
+        <input type="number" value={value} onChange={(e) => onChange(e.target.value)} className="bg-black/50 border border-slate-700 rounded p-2 text-sm text-white focus:ring-amber-500 focus:border-amber-500 transition-all"/>
     </div>
 );
 
-export const SkillDetailModal = ({ skill, onClose }) => {
-    return (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-            <div className="bg-[#1a1a1a] border border-slate-700 w-full max-w-md rounded-xl p-6 shadow-2xl">
-                <div className="flex justify-between items-center border-b border-slate-700 pb-3 mb-4">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2"><RenderIcon name={skill.icon} className={skill.color}/> {skill.name} Mastery</h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-white"><RenderIcon name="X" size={20}/></button>
-                </div>
-                <p className="text-sm text-slate-400 mb-4">{skill.desc}</p>
-                <div className="text-xs text-slate-300">Detailed stats and unlock path to be implemented here.</div>
+export const SkillDetailModal = ({ skill, onClose }) => (
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+        <div className="bg-[#1a1a1a] border border-slate-700 w-full max-w-md rounded-xl p-6 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-700 pb-3 mb-4">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2"><RenderIcon name={skill.icon} className={skill.color}/> {skill.name} Mastery</h2>
+                <button onClick={onClose} className="text-slate-400 hover:text-white"><RenderIcon name="X" size={20}/></button>
             </div>
+            <p className="text-sm text-slate-400 mb-4">{skill.desc}</p>
+            <div className="text-xs text-slate-300">Detailed stats and unlock path to be implemented here.</div>
         </div>
-    );
-};
+    </div>
+);

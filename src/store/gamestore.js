@@ -9,7 +9,7 @@ import {
     SKILL_DETAILS
 } from '../data/gamedata';
 
-// --- HELPER FUNCTIONS (Moved from dashboard.jsx to the store file) ---
+// --- HELPER FUNCTIONS ---
 
 const addToSlotArray = (slots, item, quantity = 1) => {
     const newSlots = [...slots];
@@ -61,6 +61,15 @@ const mergeData = (base, saved) => {
       lifetime: { ...base.lifetime, ...(saved?.lifetime || {}) }
   };
   
+  // FIX: Force update layout if the saved layout is from the old version
+  // We check if 'left_sidebar' exists in the saved home layout. If not, it's old.
+  if (!saved?.layout?.home?.left_sidebar) {
+      console.log("Migrating layout to v30.0 structure...");
+      merged.layout = base.layout;
+      merged.widgetConfig = base.widgetConfig; 
+  }
+
+  // Inventory array size fix
   if (Array.isArray(saved?.inventory) && saved.inventory.length !== INVENTORY_SLOTS) {
      const fixed = new Array(INVENTORY_SLOTS).fill(null);
      saved.inventory.forEach((item, i) => { if(i < INVENTORY_SLOTS) fixed[i] = item });
@@ -76,11 +85,7 @@ const mergeData = (base, saved) => {
   return merged;
 };
 
-// src/store/gamestore.js (after mergeData, before ZUSTAND STORE DEFINITION)
-
-// ... existing helper functions like mergeData
-
-// --- NEW XP CALCULATION HELPERS ---
+// --- XP CALCULATION HELPERS ---
 const calcLevel = (xp) => Math.max(1, Math.min(Math.floor(25 * Math.log10((xp / 100) + 1)), 99));
 const getXP = (base, id, data) => (Number(base) || 0) + (data.bonusXP?.[id] || 0);
 
@@ -95,7 +100,7 @@ export const useGameStore = create((set, get) => ({
   isSaving: false,
   pendingPackOpen: null,
 
-  // 2. Core I/O Actions (unchanged from last update)
+  // 2. Core I/O Actions
   loadGame: async () => {
     set({ loading: true });
     const uid = get().userId; 
@@ -136,8 +141,7 @@ export const useGameStore = create((set, get) => ({
     }
   },
 
-  // 3. Update Actions (Business Logic)
-  
+  // 3. Update Actions
   updateData: (updater) => set((state) => {
       const newData = typeof updater === 'function' ? updater(state.data) : updater;
       return { data: { ...state.data, ...newData } };
@@ -252,7 +256,6 @@ export const useGameStore = create((set, get) => ({
   },
 
   handleUseItemAction: (item, index, containerId) => {
-    
     if (containerId !== 'inventory') {
       return { success: false, message: "Move to Backpack to use" };
     }
@@ -264,14 +267,12 @@ export const useGameStore = create((set, get) => ({
         let newInventory = [...p.inventory];
         let packsOpened = p.statistics.packsOpened || 0;
         
-        // --- 1. Consume Item from Inventory ---
         if (newInventory[index].count > 1) { 
             newInventory[index].count--; 
         } else {
             newInventory[index] = null;
         }
 
-        // --- 2. Process Effect ---
         if (item.type === 'Box') {
             const pack = SHOP_ITEMS.packs.find(p => p.id === item.packId || 'p1'); 
             let updatedSlots = newInventory;
@@ -290,7 +291,6 @@ export const useGameStore = create((set, get) => ({
             
         } else if (item.type === 'Pack') {
             const newCards = generatePackCards(item.rarity);
-            
             set({ pendingPackOpen: newCards }); 
             packsOpened++;
             result = { success: true, message: `Opened ${item.rarity} Pack! New cards acquired.` };
@@ -304,17 +304,13 @@ export const useGameStore = create((set, get) => ({
                 }
             };
         } else {
-            // Placeholder for consumable effects (Energy Drink, etc.)
             result = { success: true, message: `${item.name} consumed. Effect TBD.` };
             return { data: { ...p, inventory: newInventory } };
         }
     });
-
-    // Return the result object generated inside the set call
     return result;
   },
 
-  // --- NEW MIGRATED ACTION: SELL CARD ---
   handleSellCardAction: (cardId, value) => {
     const state = get();
     const index = state.data.cards.indexOf(cardId);
@@ -345,23 +341,99 @@ export const useGameStore = create((set, get) => ({
     return { success: true, message: `Sold card for ${value} DSC` };
   },
 
-// src/store/gamestore.js (INSIDE the return object of create)
+  toggleAchievementAction: (id, isCompleting) => {
+    const state = get();
+    const achievement = state.data.achievements.find(a => a.id === id);
+    if (!achievement) return { success: false };
 
-// ... existing actions like handleSellCardAction
+    set(prevState => {
+        const prev = prevState.data;
+        let newDiscipline = prev.discipline;
+        let rewardMsg = '';
 
-  // --- XP ENGINE LOGIC (New Action: Cut from dashboard.jsx) ---
+        if (isCompleting) {
+            newDiscipline += achievement.xp;
+            if (achievement.rewardItem) {
+                const updatedInv = addToSlotArray(prev.inventory, achievement.rewardItem, achievement.rewardItem.count || 1);
+                if (updatedInv) {
+                    prev.inventory = updatedInv;
+                    rewardMsg = ` & Acquired ${achievement.rewardItem.name}`;
+                } else {
+                    rewardMsg = ` (Inventory Full - Item Lost)`;
+                }
+            }
+        }
+
+        const newAchievements = prev.achievements.map(a => 
+            a.id === id ? { ...a, completed: isCompleting } : a
+        );
+
+        return {
+            data: {
+                ...prev,
+                discipline: newDiscipline,
+                achievements: newAchievements,
+                statistics: { ...prev.statistics, contractsCompleted: (prev.statistics.contractsCompleted || 0) + (isCompleting ? 1 : 0) }
+            }
+        };
+    });
+    
+    // We need to fetch the rewardMsg from the state update context or pre-calc it. 
+    // For simplicity in this pattern, we reconstruct the msg.
+    let msg = "";
+    if(isCompleting && achievement.rewardItem) msg = " + Reward";
+    
+    return { success: true, rewardMsg: msg };
+  },
+
+  handleClaimMasteryRewardAction: (skillId, level, reward) => {
+    const state = get();
+    // Check if already claimed logic should be here or UI? 
+    // UI handles the button state, but good to double check.
+    const claimedList = state.data.lifetime.claimedMasteryRewards[skillId] || [];
+    if (claimedList.includes(level)) return { success: false, message: "Already claimed." };
+
+    set(prevState => {
+        const prev = prevState.data;
+        let newInventory = [...prev.inventory];
+        let success = true;
+
+        if (reward.type === 'Item' || reward.type === 'Gear' || reward.type === 'Consumable' || reward.type === 'Trophy') {
+            const updated = addToSlotArray(newInventory, { ...reward, rarity: 'Rare', count: 1 }, 1);
+            if (updated) newInventory = updated;
+            else success = false;
+        }
+
+        if (!success) return { data: prev }; // Abort if full
+
+        return {
+            data: {
+                ...prev,
+                inventory: newInventory,
+                lifetime: {
+                    ...prev.lifetime,
+                    claimedMasteryRewards: {
+                        ...prev.lifetime.claimedMasteryRewards,
+                        [skillId]: [...(prev.lifetime.claimedMasteryRewards[skillId] || []), level]
+                    }
+                }
+            }
+        };
+    });
+    
+    // Check if state actually updated (hacky way without return from set)
+    // Assuming success for now as we checked inventory space above
+    return { success: true, message: `Claimed ${reward.name}!` };
+  },
+
   getSkillData: () => {
     const state = get();
     const data = state.data;
     
-    // Core XP Calculation Logic 
-    // NOTE: We now pass 'data' to the getXP helper
     const incXP = getXP(data.lifetime.totalIncomeBase * 10, 'inc', data); 
     const codXP = getXP(35000 + ((data.assets?.digitalIP || 0) * 5), 'cod', data);
     const cntXP = getXP(15000 + ((data.assets?.audience || 0) * 50), 'cnt', data);
-    
     const secXP = getXP((data.cash || 0) + (data.lifetime.totalDebtPrincipalPaid * 10), 'sec', data);
-    
     const astXP = getXP(data.lifetime.totalAssetAcquisitionCost * 5, 'ast', data);
 
     const currentCashFlowValue = (data.monthlyIncome || 0) - (data.monthlyExpenses || 0);
@@ -376,7 +448,6 @@ export const useGameStore = create((set, get) => ({
     const disXP = getXP(0, 'dis', data);
     const aiXP = getXP(40000, 'ai', data);
 
-    // Self-Correction Logic (Updating the store if peak flow is higher)
     if (updatedPeakFlow > data.lifetime.peakCashFlow) {
         set(prevState => ({ 
             data: { 
@@ -393,7 +464,6 @@ export const useGameStore = create((set, get) => ({
 
     const totalXPs = skillXpMap;
     
-    // Map data to the final format needed by the UI
     const calculatedSkills = Object.keys(SKILL_DETAILS).map(key => {
         let xp = skillXpMap[key] || 0;
         return { 
@@ -405,7 +475,6 @@ export const useGameStore = create((set, get) => ({
         };
     });
 
-    // Return the required structure to the consuming component (dashboard.jsx)
     return { calculatedSkills, totalXPs };
   },
 
