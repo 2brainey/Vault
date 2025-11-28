@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useGameStore } from '../../store/gamestore'; 
-import { SHOP_ITEMS, CARD_DATABASE, SKILL_DETAILS, INVENTORY_SLOTS, USER_NAME } from '../../data/gamedata'; 
+import { SHOP_ITEMS, CARD_DATABASE, SKILL_DETAILS, INVENTORY_SLOTS, USER_NAME, WIDGET_DATABASE } from '../../data/gamedata'; 
 import { WellnessBar, InventoryGrid, ContractWidget, CollectionBinder, SkillCard, MasteryModal, MasteryLogWidget, AssetBar, InputGroup, InputField } from './dashboardui'; 
 import { RenderIcon } from './dashboardutils';
 import ShopFullPage from './shopfullpage'; 
@@ -33,6 +33,7 @@ export default function VaultDashboard() {
   const [isRightCollapsed, setIsRightCollapsed] = useState(false);
   const [isKanbanExpanded, setIsKanbanExpanded] = useState(false);
   const [rightPanelTab, setRightPanelTab] = useState('skills');
+  const [leftPanelSubTab, setLeftPanelSubTab] = useState('tasks');
   const [leftPanelWidth, setLeftPanelWidth] = useState(288);
   const [rightPanelWidth, setRightPanelWidth] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
@@ -92,7 +93,7 @@ export default function VaultDashboard() {
   const { calculatedSkills: playerSkills, totalXPs } = useMemo(() => getSkillData(), [data, getSkillData]);
   const combatStats = useMemo(() => ({ totalLevel: playerSkills.reduce((s,x)=>s+x.level,0), combatLevel: Math.floor(playerSkills.reduce((s,x)=>s+x.level,0)/4) }), [playerSkills]);
 
-  // --- RESIZING/DRAG LOGIC (omitted for brevity) ---
+  // --- RESIZING/DRAG LOGIC ---
   useEffect(() => {
     const handleMouseMove = (e) => {
         if (!isResizing) return;
@@ -111,15 +112,34 @@ export default function VaultDashboard() {
       updateData(prev => ({ layout: { ...prev.layout, home: { ...prev.layout.home, widgetSizes: { ...prev.layout.home.widgetSizes, [id]: nextSize } } } }));
   };
 
-  const handleDragStart = (e, wId) => { if(editMode) { e.dataTransfer.setData("wId", wId); } };
+  const handleDragStart = (e, wId) => { 
+      if(editMode) { 
+          e.dataTransfer.setData("wId", wId); 
+          e.dataTransfer.setData("sourceType", WIDGET_DATABASE.some(w => w.id === wId) ? 'WDB' : 'GRID'); 
+      } 
+  };
+  
   const handleDrop = (e, tCol, tIdx) => {
       e.preventDefault();
       const wId = e.dataTransfer.getData("wId");
+      const sourceType = e.dataTransfer.getData("sourceType");
       if(!wId) return;
+
       updateData(prev => {
-          const list = prev.layout.home.center.filter(x => x !== wId);
-          list.splice(tIdx, 0, wId);
-          return { layout: { ...prev.layout, home: { ...prev.layout.home, center: list } } };
+          let newCenter = [...prev.layout.home.center];
+          let newWidgetConfig = { ...prev.widgetConfig };
+
+          if (sourceType === 'GRID') {
+              newCenter = newCenter.filter(x => x !== wId);
+          }
+          
+          newCenter.splice(tIdx, 0, wId);
+          newWidgetConfig[wId] = true;
+
+          return { 
+              layout: { ...prev.layout, home: { ...prev.layout.home, center: newCenter } },
+              widgetConfig: newWidgetConfig
+          };
       });
   };
 
@@ -162,11 +182,32 @@ export default function VaultDashboard() {
     }
   };
 
+  const renderWidgetDatabase = () => (
+      <div className="space-y-4 p-4">
+          <div className="text-xs font-bold text-amber-400 uppercase">Draggable Widgets</div>
+          <p className="text-[10px] text-slate-400 mb-4">Drag these elements onto the center grid to add them to your layout.</p>
+          <div className="grid grid-cols-2 gap-3">
+              {WIDGET_DATABASE.map(item => (
+                  <div 
+                      key={item.id}
+                      draggable={true}
+                      onDragStart={(e) => handleDragStart(e, item.id)}
+                      className="p-3 bg-slate-800 rounded-lg border border-slate-700 cursor-grab flex flex-col items-center text-center hover:border-amber-500 transition-colors"
+                      title={`Drag ${item.name}`}
+                  >
+                      <RenderIcon name={item.icon} size={18} className="text-amber-500 mb-1"/>
+                      <span className="text-[10px] font-bold text-white leading-none">{item.name}</span>
+                      <span className="text-[9px] text-slate-500 mt-1">{item.category}</span>
+                  </div>
+              ))}
+          </div>
+      </div>
+  );
+
   return (
     <div className="min-h-screen text-slate-200 font-sans bg-vault-dark flex flex-col">
       {toast && <div className="fixed top-20 right-4 z-50 bg-[#232a3a] border border-amber-500 text-white px-4 py-3 rounded shadow-xl"><RenderIcon name="Zap" size={16} className="text-amber-500" /> <span className="text-sm font-bold">{toast.msg}</span></div>}
       
-      {/* Mastery Modal */}
       {skillModal && <MasteryModal skill={skillModal} onClose={() => setSkillModal(null)} onClaimReward={handleClaimMasteryReward} claimedLevels={data.lifetime.claimedMasteryRewards[skillModal.id] || []}/>}
 
       {/* HEADER */}
@@ -216,15 +257,42 @@ export default function VaultDashboard() {
       </div>
 
       <main className="flex-1 overflow-hidden relative">
+        {/* --- HOME TAB --- */}
         {activeTab === 'dynamic' && (
             <div className="flex h-[calc(100vh-80px)] overflow-hidden">
-                {/* 1. LEFT: COLLAPSIBLE TODO */}
+                {/* 1. LEFT: COLLAPSIBLE TODO/WIDGET DB */}
                 <div className={`transition-colors duration-100 border-r border-slate-700 bg-[#161b22] relative flex flex-col shrink-0 ${isTodoCollapsed ? 'w-12' : ''}`} style={{ width: isTodoCollapsed ? '3rem' : `${leftPanelWidth}px` }}>
                     <div className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-slate-600/50 z-20" onMouseDown={(e)=>{e.preventDefault(); setIsResizing('left')}}/>
                     <button onClick={() => setIsTodoCollapsed(!isTodoCollapsed)} className="absolute -right-3 top-4 bg-slate-700 text-white p-1 rounded-full z-10 border border-slate-500"><RenderIcon name={isTodoCollapsed ? "ChevronRight" : "ChevronLeft"} size={12}/></button>
-                    <div className={`flex-1 overflow-y-auto ${isTodoCollapsed ? 'opacity-0' : 'p-4'}`}>
-                        <div className="h-full flex flex-col"><h3 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2"><RenderIcon name="List" size={14}/> Operations</h3>{data.layout.home.left_sidebar.map(w => <div key={w} className="h-full">{renderWidget(w, 'left')}</div>)}</div>
-                    </div>
+                    
+                    {/* Collapsed Icons */}
+                    {isTodoCollapsed ? (
+                        <div className="pt-4 flex flex-col items-center gap-4">
+                            <button onClick={() => { setIsTodoCollapsed(false); setLeftPanelSubTab('tasks'); }} className="group relative p-2 rounded hover:bg-slate-700/50">
+                                <RenderIcon name="List" size={24} className="text-slate-500"/>
+                                <span className="absolute left-12 top-2 z-50 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Tasks</span>
+                            </button>
+                            <button onClick={() => { setIsTodoCollapsed(false); setLeftPanelSubTab('widgets'); }} className="group relative p-2 rounded hover:bg-slate-700/50">
+                                <RenderIcon name="Grid" size={24} className="text-amber-500"/>
+                                <span className="absolute left-12 top-2 z-50 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Widgets</span>
+                            </button>
+                        </div>
+                    ) : (
+                        // Expanded View
+                        <div className={`flex-1 overflow-y-auto flex flex-col`}>
+                            <div className="flex justify-around p-4 border-b border-slate-700">
+                                <button onClick={() => setLeftPanelSubTab('tasks')} className={`flex-1 py-1 text-xs font-bold rounded ${leftPanelSubTab === 'tasks' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Tasks</button>
+                                <button onClick={() => setLeftPanelSubTab('widgets')} className={`flex-1 py-1 text-xs font-bold rounded ${leftPanelSubTab === 'widgets' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Widget DB</button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                {leftPanelSubTab === 'tasks' ? (
+                                    <div className="p-4">{data.layout.home.left_sidebar.map(w => <div key={w} className="h-full">{renderWidget(w, 'left')}</div>)}</div>
+                                ) : (
+                                    renderWidgetDatabase()
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* 2. CENTER: GRID */}
@@ -236,25 +304,32 @@ export default function VaultDashboard() {
                 </div>
 
                 {/* 3. RIGHT: COLLAPSIBLE & RESIZABLE PANEL */}
-                <div className={`bg-[#1a1a1a] border-l border-slate-700 flex flex-col shrink-0 relative transition-all duration-100 z-30 ${isRightCollapsed ? 'w-12' : ''}`} style={{ width: isRightCollapsed ? '3rem' : `${rightPanelWidth}px` }}>
+                <div className={`bg-[#1a1a1a] border-l border-slate-700 flex flex-col shrink-0 relative transition-all duration-100 z-50 ${isRightCollapsed ? 'w-12' : ''}`} style={{ width: isRightCollapsed ? '3rem' : `${rightPanelWidth}px` }}>
                     <div className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-slate-600/50 z-20" onMouseDown={(e)=>{e.preventDefault(); setIsResizing('right')}}/>
-                    <button onClick={() => setIsRightCollapsed(!isRightCollapsed)} className="absolute -left-3 top-4 bg-slate-700 text-white p-1 rounded-full z-30 border border-slate-500"><RenderIcon name={isRightCollapsed ? "ChevronLeft" : "ChevronRight"} size={12}/></button>
-                    <div className={`flex-1 flex flex-col overflow-hidden ${isRightCollapsed ? 'opacity-0' : 'opacity-100'}`}>
-                        <div className="p-2 border-b border-slate-800 bg-[#131313] flex justify-center sticky top-0 z-10 gap-1">{['skills', 'inventory'].map(t => <button key={t} onClick={() => setRightPanelTab(t)} className={`flex-1 py-2 text-xs font-bold uppercase rounded ${rightPanelTab===t ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white'}`}>{t}</button>)}</div>
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
-                            {rightPanelTab === 'skills' && playerSkills.map(skill => (
-                                <div 
-                                    key={skill.id} 
-                                    // FIXED: Merge static SKILL_DETAILS with dynamic data/XP before setting modal
-                                    onClick={() => setSkillModal({ ...SKILL_DETAILS[skill.id], ...skill, currentXP: totalXPs[skill.id] })} 
-                                    className="flex justify-between items-center text-xs p-2 bg-black/40 rounded border border-slate-800 cursor-pointer hover:bg-slate-700">
-                                        <div className="flex items-center gap-2 text-slate-300"><RenderIcon name={skill.iconName} size={14} className={skill.color}/> {skill.name}</div><div className="font-mono">Lvl {skill.level}</div>
-                                </div>
-                            ))}
-                            {rightPanelTab === 'inventory' && <InventoryGrid slots={data.inventory} mp={data.discipline} onUseItem={handleUseItem} containerId="inventory" />}
+                    <button onClick={() => setIsRightCollapsed(!isRightCollapsed)} className="absolute -left-3 top-4 bg-slate-700 text-white p-1 rounded-full z-50 border border-slate-500"><RenderIcon name={isRightCollapsed ? "ChevronLeft" : "ChevronRight"} size={12}/></button>
+                    
+                    {/* Collapsed Icons */}
+                    {isRightCollapsed ? (
+                        <div className="pt-4 flex flex-col items-center gap-4">
+                            <button onClick={() => { setIsRightCollapsed(false); setRightPanelTab('skills'); }} className="group relative p-2 rounded hover:bg-slate-700/50">
+                                <RenderIcon name="Scroll" size={24} className="text-amber-500"/>
+                                <span className="absolute right-12 top-2 z-50 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Skills</span>
+                            </button>
+                            <button onClick={() => { setIsRightCollapsed(false); setRightPanelTab('inventory'); }} className="group relative p-2 rounded hover:bg-slate-700/50">
+                                <RenderIcon name="Package" size={24} className="text-emerald-500"/>
+                                <span className="absolute right-12 top-2 z-50 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Inventory</span>
+                            </button>
                         </div>
-                    </div>
-                    {isRightCollapsed && <div className="pt-4 flex flex-col items-center gap-4 text-slate-500"><RenderIcon name="Layers" size={24} /></div>}
+                    ) : (
+                        // Expanded Content
+                        <div className={`flex-1 flex flex-col overflow-hidden opacity-100`}>
+                            <div className="p-2 border-b border-slate-800 bg-[#131313] flex justify-center sticky top-0 z-10 gap-1">{['skills', 'inventory'].map(t => <button key={t} onClick={() => setRightPanelTab(t)} className={`flex-1 py-2 text-xs font-bold uppercase rounded ${rightPanelTab===t ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white'}`}>{t}</button>)}</div>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
+                                {rightPanelTab === 'skills' && playerSkills.map(skill => (<div key={skill.id} onClick={() => setSkillModal({ ...SKILL_DETAILS[skill.id], ...skill, currentXP: totalXPs[skill.id] })} className="flex justify-between items-center text-xs p-2 bg-black/40 rounded border border-slate-800 cursor-pointer hover:bg-slate-700"><div className="flex items-center gap-2 text-slate-300"><RenderIcon name={skill.iconName} size={14} className={skill.color}/> {skill.name}</div><div className="font-mono">Lvl {skill.level}</div></div>))}
+                                {rightPanelTab === 'inventory' && <InventoryGrid slots={data.inventory} mp={data.discipline} onUseItem={handleUseItem} containerId="inventory" />}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         )}

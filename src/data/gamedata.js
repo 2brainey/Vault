@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export const USER_NAME = "Justin";
-export const CURRENT_VERSION = "v31.1"; // Vitals Moved to Header
+export const CURRENT_VERSION = "v32.0"; // Added Widget Database
 export const INVENTORY_SLOTS = 28;
 export const BANK_SLOTS = 50;
 export const MAX_SKILL_LEVEL = 99;
@@ -29,6 +29,7 @@ export const CARDS_PER_PAGE = 8;
 export const PLOT_COST = 1000;
 export const MAX_GRID_DIMENSION = 10;
 
+// --- STATIC DATA: SKILL DETAILS ---
 export const SKILL_DETAILS = {
   inc: { name: "Income", icon: "Sword", color: "text-emerald-400", desc: "Raw earning power.", unlocks: [] },
   cod: { name: "Code", icon: "Code", color: "text-blue-400", desc: "Software proficiency.", unlocks: [] },
@@ -45,6 +46,7 @@ export const SKILL_DETAILS = {
   dis: { name: "Discipline", icon: "Flame", color: "text-amber-500", desc: "Willpower.", unlocks: [] },
 };
 
+// --- STATIC DATA: CARD DATABASE ---
 export const CARD_DATABASE = [
   { id: 'c1', name: "Hello World", rarity: "Common", desc: "Your first line of code.", iconName: "Code", value: 50 },
   { id: 'c2', name: "Syntax Error", rarity: "Common", desc: "A rite of passage.", iconName: "AlertTriangle", value: 50 },
@@ -68,6 +70,7 @@ export const CARD_DATABASE = [
   { id: 'l1', name: "The Singularity", rarity: "Legendary", desc: "Intelligence explosion.", iconName: "Dna", value: 5000 },
 ];
 
+// --- STATIC DATA: SHOP ITEMS ---
 export const SHOP_ITEMS = {
   boosters: [
     { id: 'b1', name: "Coding Bootcamp", cost: 500, effect: "+5,000 Code XP", iconName: "Code", skillId: 'cod', xpAmount: 5000, color: "text-blue-400", rarity: "Rare", type: "Booster" },
@@ -106,6 +109,7 @@ export const SHOP_ITEMS = {
   ]
 };
 
+// --- STATIC DATA: ESTATE ROOMS ---
 export const ESTATE_ROOMS = [
     { id: 'expansion', name: 'Land Expansion', cost: 25000, icon: 'Expand', desc: `Expands grid to ${MAX_GRID_DIMENSION}x${MAX_GRID_DIMENSION} max`, type: 'Special', isExpansion: true },
     { id: 'plot_deed', name: 'Plot Deed', cost: PLOT_COST, icon: 'Map', desc: 'Claim a single plot of land', type: 'Special', isDeed: true },
@@ -121,6 +125,17 @@ export const ESTATE_ROOMS = [
     { id: 'garden', name: 'Zen Garden', cost: 6000, icon: 'Sprout', desc: '+5 Energy Regen/Day', type: 'Wellness', multiplier: 1.0 },
 ];
 
+// NEW: Widget Database for the drag-and-drop source panel
+export const WIDGET_DATABASE = [
+    { id: 'productivity_timer', name: 'Focus Timer', icon: 'Clock', category: 'Focus', defaultSize: 'col-span-1' },
+    { id: 'task_command_center', name: 'Kanban Board', icon: 'Trello', category: 'Task', defaultSize: 'col-span-2' },
+    { id: 'player_card', name: 'Player Card', icon: 'User', category: 'Profile', defaultSize: 'col-span-1' },
+    { id: 'active_contracts', name: 'Contracts', icon: 'Briefcase', category: 'Goals', defaultSize: 'col-span-2' },
+    { id: 'financial_overview', name: 'Net Worth Summary', icon: 'DollarSign', category: 'Finance', defaultSize: 'col-span-1' },
+    { id: 'mastery_log_widget', name: 'Mastery Overview', icon: 'Scroll', category: 'Skills', defaultSize: 'col-span-1' },
+];
+
+// --- INITIAL DATA ---
 export const initialData = {
   setupComplete: true, 
   lastVersion: null, 
@@ -191,27 +206,23 @@ export const initialData = {
   
   widgetConfig: { 
     welcome: true, 
-    daily_ops: false, // Widget is removed
     productivity_timer: true,
     task_command_center: true, 
     todo_list: true,
     
-    shop: false,      
-    contract: false,  
-
-    skills: true,     
-    player_card: true, p_vitals: true, financial_overview: true, unified_menu: true, 
-    active_contracts: true, collection: true, mastery_log_widget: true, mastery_log_btn: true,
-    asset_wallet: true, 
+    // Defaulting these to false, they are available in the Widget DB
+    player_card: false, active_contracts: false, financial_overview: false, mastery_log_widget: false,
+    
+    // Other fixed widgets kept true for completeness
+    p_vitals: true, unified_menu: true, mastery_log_btn: true, asset_wallet: true, 
   },
   
   layout: {
     home: {
         left_sidebar: ['todo_list'],
-        center: ['productivity_timer', 'task_command_center'], // REMOVED 'daily_ops'
+        center: ['productivity_timer', 'task_command_center'], 
         right_sidebar: ['skills', 'inventory'],
         widgetSizes: {
-            // Note: Removed daily_ops size config
             'productivity_timer': 'col-span-1',
             'task_command_center': 'col-span-2'
         }
@@ -222,7 +233,7 @@ export const initialData = {
         right: ['active_contracts', 'collection']
     },
     vault: {
-        left: ['player_card', 'p_vitals'], // Used as placeholder for Vault tabs
+        left: ['player_card', 'p_vitals'], 
         center: ['financial_overview', 'unified_menu'],
         right: ['collection', 'asset_wallet']
     }
