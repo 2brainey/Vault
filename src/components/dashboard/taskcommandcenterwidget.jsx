@@ -1,53 +1,65 @@
 import React, { useState } from 'react';
-import { Trello } from 'lucide-react';
+import { LayoutDashboard, Plus, MoreHorizontal } from 'lucide-react';
 
-const TaskCommandCenterWidget = ({ onLaunchBoard }) => {
-  const colors = { gold: '#e1b542', bronze: '#78643e', slateBlue: '#404e6d', darkBase: '#2b3446' };
-  const goldAccent = { color: colors.gold, textShadow: `0 0 8px ${colors.gold}80` };
-  const [newKanbanInput, setNewKanbanInput] = useState('');
-  const [newKanbanTag, setNewKanbanTag] = useState('Code');
-  
-  const [kanbanTasks, setKanbanTasks] = useState([
-    { id: 1, title: 'Design Vault Logo', status: 'done', tag: 'Design' },
-    { id: 2, title: 'Code Drag & Drop Logic', status: 'in-progress', tag: 'Code' },
-    { id: 3, title: 'Record Devlog #1', status: 'todo', tag: 'Content' },
-    { id: 4, title: 'Setup Dream Gang Bot', status: 'todo', tag: 'Code' },
+const TaskCommandCenterWidget = () => {
+  const [tasks, setTasks] = useState([
+    { id: 1, title: 'Refactor Vitals UI', status: 'todo', tag: 'Code' },
+    { id: 2, title: 'Design Brain Asset', status: 'in-progress', tag: 'Art' },
+    { id: 3, title: 'Fix Resize Bug', status: 'done', tag: 'Bug' },
   ]);
+  const [newTask, setNewTask] = useState('');
 
-  const addKanbanTask = (title, tag = 'Code') => { 
-    if (!title.trim()) return;
-    const newTask = { id: Date.now(), title: title, status: 'todo', tag: tag };
-    setKanbanTasks([...kanbanTasks, newTask]);
-    setNewKanbanInput('');
+  const addTask = () => {
+      if(!newTask.trim()) return;
+      setTasks([...tasks, { id: Date.now(), title: newTask, status: 'todo', tag: 'Gen' }]);
+      setNewTask('');
   };
 
-  const handleQuickFireTask = () => {
-    if (!newKanbanInput.trim()) return;
-    addKanbanTask(newKanbanInput, newKanbanTag);
+  const moveTask = (id, newStatus) => {
+      setTasks(tasks.map(t => t.id === id ? { ...t, status: newStatus } : t));
   };
 
-  const getCount = (status) => kanbanTasks.filter(t => t.status === status).length;
+  const renderColumn = (status, label, color) => (
+      <div className="flex-1 flex flex-col bg-black/20 rounded-lg border border-slate-700/50 overflow-hidden h-full">
+          <div className={`px-3 py-2 text-[10px] font-bold uppercase tracking-wider ${color} bg-black/30 flex justify-between`}>
+              {label} <span>{tasks.filter(t => t.status === status).length}</span>
+          </div>
+          <div className="flex-1 p-2 space-y-2 overflow-y-auto custom-scrollbar">
+              {tasks.filter(t => t.status === status).map(t => (
+                  <div key={t.id} className="bg-[#2a2a2a] p-2 rounded border border-slate-700 hover:border-slate-500 group relative">
+                      <div className="text-xs text-white font-medium mb-1">{t.title}</div>
+                      <div className="flex justify-between items-center">
+                          <span className="text-[9px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">{t.tag}</span>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {status !== 'todo' && <button onClick={() => moveTask(t.id, status === 'done' ? 'in-progress' : 'todo')} className="w-4 h-4 rounded bg-slate-700 hover:bg-slate-600 text-[8px] flex items-center justify-center text-white">{'<'}</button>}
+                              {status !== 'done' && <button onClick={() => moveTask(t.id, status === 'todo' ? 'in-progress' : 'done')} className="w-4 h-4 rounded bg-slate-700 hover:bg-slate-600 text-[8px] flex items-center justify-center text-white">{'>'}</button>}
+                          </div>
+                      </div>
+                  </div>
+              ))}
+          </div>
+      </div>
+  );
 
   return (
-    <div className="h-full w-full flex flex-col justify-between group p-6 rounded-lg border shadow-lg hover:border-white/30 transition-all" style={{ background: `linear-gradient(180deg, ${colors.slateBlue} 0%, ${colors.darkBase} 100%)`, borderColor: colors.bronze, boxShadow: `inset 0 0 15px rgba(0,0,0,0.5)` }}>
-      <div>
-        <h3 className="flex items-center gap-3 font-extrabold mb-4 text-lg" style={goldAccent}><Trello size={20} /> TASK COMMAND CENTER</h3>
-        <div className="pt-3 border-t border-white/10 mb-4">
-          <input type="text" value={newKanbanInput} onChange={(e) => setNewKanbanInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleQuickFireTask(); } }} placeholder="Quick task... (Enter to add to To Do)" className="w-full bg-black/40 text-white text-sm p-2 rounded border border-white/10 focus:outline-none font-mono"/>
-          <div className="flex justify-between items-center mt-2">
-            <select value={newKanbanTag} onChange={(e) => setNewKanbanTag(e.target.value)} className="bg-black/40 text-white text-xs p-1 rounded border border-white/10 focus:outline-none">
-              <option value="Code">Code</option><option value="Content">Content</option><option value="Design">Design</option><option value="Biz">Biz</option>
-            </select>
-            <div className="text-[10px] font-mono text-white/50">TAG: {newKanbanTag}</div>
+    <div className="h-full w-full flex flex-col p-4 bg-[#1e1e1e] border border-[#404e6d] rounded-xl shadow-lg relative">
+      <div className="flex justify-between items-center mb-4">
+          <h3 className="font-bold text-white flex items-center gap-2"><LayoutDashboard size={18} className="text-amber-500"/> COMMAND CENTER</h3>
+          <div className="flex gap-2">
+              <input 
+                  value={newTask} onChange={(e) => setNewTask(e.target.value)} 
+                  onKeyDown={(e) => e.key === 'Enter' && addTask()}
+                  placeholder="New Task..." 
+                  className="bg-black/40 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-amber-500 w-40"
+              />
+              <button onClick={addTask} className="p-1 bg-amber-600 hover:bg-amber-500 rounded text-white"><Plus size={14}/></button>
           </div>
-        </div>
-        <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono text-white/70">
-           <div className="bg-black/30 p-2 rounded border border-white/5"><div className="font-bold text-white mb-1">{getCount('todo')}</div>TO DO</div>
-           <div className="bg-black/30 p-2 rounded border border-white/5"><div className="font-bold text-yellow-400 mb-1">{getCount('in-progress')}</div>DOING</div>
-           <div className="bg-black/30 p-2 rounded border border-white/5"><div className="font-bold text-green-400 mb-1">{getCount('done')}</div>DONE</div>
-        </div>
       </div>
-      <button onClick={() => onLaunchBoard('Kanban')} className="mt-6 w-full py-3 rounded-md bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-colors font-bold tracking-wider text-xs">LAUNCH BOARD</button>
+      <div className="flex-1 flex gap-3 overflow-hidden min-h-[200px]">
+          {renderColumn('todo', 'To Do', 'text-slate-400')}
+          {renderColumn('in-progress', 'Active', 'text-blue-400')}
+          {renderColumn('done', 'Done', 'text-emerald-400')}
+      </div>
     </div>
   );
 };

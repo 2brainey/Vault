@@ -1,128 +1,99 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, RotateCcw } from 'lucide-react';
+import { Play, Pause, RotateCcw, Brain, Zap } from 'lucide-react';
+import { useGameStore } from '../../store/gamestore';
 
 const ProductivityTimerWidget = () => {
-  // --- THEME CONSTANTS ---
-// 2brainey/vault/Vault-c56edab4e9ba95c3fc4abb92c22f46eb83c3b7f6/src/components/dashboard/productivitytimerwidget.jsx
-
-// Lines 7-13: Replace old hardcoded definitions
-const colors = { 
-  gold: '#e1b542',       // vault-amber
-  success: '#4ade80',    // vault-success
-  bronze: '#78643e',     // vault-bronze
-  slateBlue: '#404e6d',  // vault-slate
-  darkBase: '#2b3446'    // vault-dark
-};
-// ... rest of the component uses these constants correctly for gradients and inline styles.
-  const goldAccent = { color: colors.gold, textShadow: `0 0 8px ${colors.gold}80` };
-
-  // --- STATE ---
-  const defaultFocusMinutes = 25;
+  const { completeFocusSession, data } = useGameStore();
+  const colors = { gold: '#e1b542', slateBlue: '#404e6d', darkBase: '#2b3446' };
+  
   const [timerActive, setTimerActive] = useState(false);
-  const [focusDuration, setFocusDuration] = useState(defaultFocusMinutes);
-  const [timeLeft, setTimeLeft] = useState(defaultFocusMinutes * 60);
-  const [sessionType, setSessionType] = useState('DEEP WORK');
+  const [focusDuration, setFocusDuration] = useState(25);
+  const [timeLeft, setTimeLeft] = useState(25 * 60);
+  const [customInput, setCustomInput] = useState('');
 
-  // --- TIMER LOGIC ---
   useEffect(() => {
     let interval = null;
     if (timerActive && timeLeft > 0) {
       interval = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
     } else if (timeLeft === 0 && timerActive) {
       setTimerActive(false);
-      // Trigger completion logic here (e.g., sound effect, API update)
+      completeFocusSession(focusDuration); // Claim rewards on finish
     }
     return () => clearInterval(interval);
-  }, [timerActive, timeLeft]);
+  }, [timerActive, timeLeft, focusDuration, completeFocusSession]);
 
-  // --- HANDLERS ---
-  const handleDurationChange = (e) => {
-    const newDuration = parseInt(e.target.value) || 0;
-    setFocusDuration(newDuration);
-    if (!timerActive) setTimeLeft(newDuration * 60);
+  const setPreset = (mins) => {
+      setFocusDuration(mins);
+      setTimeLeft(mins * 60);
+      setTimerActive(false);
   };
 
-  const toggleTimer = () => {
-    if (timeLeft === 0) setTimeLeft(focusDuration * 60);
-    setTimerActive(!timerActive);
+  const handleCustomStart = () => {
+      const mins = parseInt(customInput) || 25;
+      setPreset(mins);
   };
 
-  const resetTimer = () => {
-    setTimerActive(false);
-    setTimeLeft(focusDuration * 60);
-  };
-
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  const toggleTimer = () => setTimerActive(!timerActive);
+  const resetTimer = () => { setTimerActive(false); setTimeLeft(focusDuration * 60); };
+  const formatTime = (seconds) => `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
 
   return (
-    <div 
-      className="h-full w-full flex flex-col justify-between relative overflow-hidden p-6 rounded-lg border shadow-lg" 
-      style={{ 
-        background: `linear-gradient(180deg, ${colors.slateBlue} 0%, ${colors.darkBase} 100%)`, 
-        borderColor: colors.gold,
-        boxShadow: `inset 0 0 15px rgba(0,0,0,0.5)` 
-      }}
-    >
-      {/* Background Icon Watermark */}
-      <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-        <RotateCcw size={120} />
-      </div>
+    <div className="h-full w-full flex flex-col justify-between p-6 rounded-lg border shadow-lg relative overflow-hidden" 
+         style={{ background: `linear-gradient(180deg, ${colors.slateBlue} 0%, ${colors.darkBase} 100%)`, borderColor: colors.gold }}>
       
-      {/* Header & Display */}
-      <div>
-        <h3 className="flex items-center gap-2 font-extrabold mb-1 text-lg" style={goldAccent}>
-          PRODUCTIVITY PROTOCOL
-        </h3>
-        <p className="text-xs text-white/50 mb-4 font-mono tracking-wide">SESSION: {sessionType}</p>
-        
-        <div className="flex items-center justify-center py-4">
-          <div 
-            className="font-mono font-bold tracking-tighter text-6xl" 
-            style={{ 
-              textShadow: `0 0 20px ${timerActive ? colors.success : colors.gold}40`, 
-              color: timerActive ? colors.success : 'white' 
-            }}
-          >
+      {/* Header */}
+      <div className="flex justify-between items-start mb-4">
+          <div>
+            <h3 className="font-extrabold text-lg text-white flex items-center gap-2"><Brain size={20} className="text-pink-400"/> NEURAL SYNC</h3>
+            <p className="text-[10px] text-slate-400 uppercase tracking-wider">Generate Brain Matter</p>
+          </div>
+          <div className="text-right">
+              <div className="text-xs font-bold text-slate-300">POTENTIAL</div>
+              <div className="text-emerald-400 font-mono text-sm">+{Math.floor(focusDuration * 10 * (1 + focusDuration/100))} BM</div>
+          </div>
+      </div>
+
+      {/* Timer Display */}
+      <div className="flex-1 flex items-center justify-center py-2">
+          <div className={`font-mono font-bold text-6xl ${timerActive ? 'text-emerald-400 animate-pulse' : 'text-white'}`} style={{ textShadow: '0 0 20px rgba(0,0,0,0.5)' }}>
             {formatTime(timeLeft)}
           </div>
-        </div>
-        
-        <div className="flex items-center justify-center gap-2 mt-2">
-          <label className="text-xs text-white/60 font-mono">Duration (min):</label>
-          <input 
-            type="number" 
-            value={focusDuration} 
-            onChange={handleDurationChange} 
-            min="1" 
-            disabled={timerActive} 
-            className="w-16 bg-black/40 text-center text-white text-sm p-1 rounded border border-white/10 focus:outline-none disabled:opacity-50" 
-          />
-        </div>
       </div>
 
       {/* Controls */}
-      <div className="flex gap-3 mt-4">
-        <button 
-          onClick={toggleTimer} 
-          className={`flex-1 py-3 rounded font-bold flex items-center justify-center gap-2 transition-all text-base ${
-            timerActive 
-              ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30' 
-              : 'bg-green-500/20 text-green-500 border border-green-500/30 hover:bg-green-500/30'
-          }`}
-        >
-          {timerActive ? <><Pause size={18} /> PAUSE</> : <><Play size={18} /> INITIATE</>}
-        </button>
-        
-        <button 
-          onClick={resetTimer} 
-          className="px-4 py-3 rounded bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-        >
-          <RotateCcw size={18} />
-        </button>
+      <div className="space-y-2">
+          {!timerActive ? (
+              <div className="grid grid-cols-1 gap-2">
+                  <button onClick={() => setPreset(25)} className="bg-slate-700/50 hover:bg-slate-600 border border-slate-600 rounded p-2 text-xs font-bold text-white flex justify-between px-4">
+                      <span>SHORT CYCLE</span> <span>25 MIN</span>
+                  </button>
+                  <button onClick={() => setPreset(50)} className="bg-slate-700/50 hover:bg-slate-600 border border-slate-600 rounded p-2 text-xs font-bold text-white flex justify-between px-4">
+                      <span>DEEP CYCLE</span> <span>50 MIN</span>
+                  </button>
+                  <div className="flex gap-2">
+                      <input 
+                        type="number" 
+                        placeholder="CUSTOM" 
+                        value={customInput} 
+                        onChange={(e) => setCustomInput(e.target.value)} 
+                        className="bg-black/40 border border-slate-600 rounded px-3 text-xs text-white w-20 focus:outline-none focus:border-emerald-500"
+                      />
+                      <button onClick={handleCustomStart} className="flex-1 bg-emerald-900/50 hover:bg-emerald-800 border border-emerald-700 rounded text-emerald-400 text-xs font-bold">SET</button>
+                  </div>
+                  <button onClick={toggleTimer} className="mt-2 w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded shadow-lg flex items-center justify-center gap-2">
+                      <Play size={16} fill="currentColor" /> INITIATE LINK
+                  </button>
+              </div>
+          ) : (
+              <div className="flex gap-2">
+                  <button onClick={toggleTimer} className="flex-1 py-3 bg-yellow-600 hover:bg-yellow-500 text-white font-bold rounded shadow-lg flex items-center justify-center gap-2">
+                      <Pause size={16} fill="currentColor" /> PAUSE
+                  </button>
+                  <button onClick={resetTimer} className="px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded shadow-lg">
+                      <RotateCcw size={16} />
+                  </button>
+              </div>
+          )}
       </div>
     </div>
   );

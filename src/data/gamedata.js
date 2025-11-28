@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export const USER_NAME = "Justin";
-export const CURRENT_VERSION = "v30.0"; 
+export const CURRENT_VERSION = "v31.1"; // Vitals Moved to Header
 export const INVENTORY_SLOTS = 28;
 export const BANK_SLOTS = 50;
 export const MAX_SKILL_LEVEL = 99;
@@ -191,12 +191,11 @@ export const initialData = {
   
   widgetConfig: { 
     welcome: true, 
-    daily_ops: true, 
+    daily_ops: false, // Widget is removed
     productivity_timer: true,
     task_command_center: true, 
     todo_list: true,
     
-    // Removed from Home (default state set to false for safety)
     shop: false,      
     contract: false,  
 
@@ -209,8 +208,13 @@ export const initialData = {
   layout: {
     home: {
         left_sidebar: ['todo_list'],
-        center: ['daily_ops', 'productivity_timer', 'task_command_center'],
-        right_sidebar: ['skills', 'inventory'] 
+        center: ['productivity_timer', 'task_command_center'], // REMOVED 'daily_ops'
+        right_sidebar: ['skills', 'inventory'],
+        widgetSizes: {
+            // Note: Removed daily_ops size config
+            'productivity_timer': 'col-span-1',
+            'task_command_center': 'col-span-2'
+        }
     },
     profile: {
         left: ['player_card', 'p_vitals'],
@@ -218,8 +222,8 @@ export const initialData = {
         right: ['active_contracts', 'collection']
     },
     vault: {
-        left: ['financial_overview'],
-        center: ['unified_menu'],
+        left: ['player_card', 'p_vitals'], // Used as placeholder for Vault tabs
+        center: ['financial_overview', 'unified_menu'],
         right: ['collection', 'asset_wallet']
     }
   }
