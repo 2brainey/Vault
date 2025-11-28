@@ -459,11 +459,12 @@ export const initialData = {
     mastery_log_btn: true, // Force button widget visible
     productivity_timer: true,
     task_command_center: true, // NEW WIDGET
+    todo_list: true, // <--- NEW WIDGET ENABLED BY DEFAULT
   },
   layout: {
     home: {
-        left: ['daily_ops', 'contract', 'productivity_timer', 'task_command_center'], // PLACED IN LEFT COLUMN
-        right: ['shop', 'skills'] 
+        left: ['daily_ops', 'contract', 'productivity_timer', 'task_command_center'],
+        right: ['shop', 'skills', 'todo_list'] // PLACED IN RIGHT COLUMN
     },
     // UPDATED: Add mastery_log_widget to a column for initial display
     profile: {

@@ -25,6 +25,7 @@ import EstatePrototype from './estateprototype';
 import ProductivityTimerWidget from './productivitytimerwidget'; 
 import TaskCommandCenterWidget from './taskcommandcenterwidget'; // NEW IMPORT
 import LogisticsDashboard from './logisticsdashboard';
+import TodoList from './todo_list'; // NEW IMPORT
 
 export default function VaultDashboard() {
   
@@ -121,7 +122,7 @@ const colors = {
 
         // 2. PLACEMENT CHECK: If we are TURNING THE WIDGET ON (setting to true)
         // AND it's a home widget that isn't placed yet, inject it.
-        if (!isCurrentlyEnabled && ['daily_ops', 'contract', 'skills', 'shop', 'productivity_timer', 'task_command_center'].includes(key)) {
+        if (!isCurrentlyEnabled && ['daily_ops', 'contract', 'skills', 'shop', 'productivity_timer', 'task_command_center', 'todo_list'].includes(key)) {
             
             // Check if the widget exists in EITHER the left or right home column
             const isPlaced = newLayout.home.left.includes(key) || newLayout.home.right.includes(key);
@@ -409,6 +410,7 @@ const colors = {
              {homeWidgetTab === 'contracts' && <ContractWidget contracts={displayContracts} onToggle={toggleAchievement} title="" />}
           </div>
         );
+       
       case 'shop':
         return (
           <div className={`${commonWrapperClass} p-4 h-fit`}>
@@ -480,6 +482,7 @@ const colors = {
           </div>
         );
       // --------------------------------------------------
+  
 
       // --- NEW CASE: TASK COMMAND CENTER ---
       case 'task_command_center': 
@@ -491,6 +494,23 @@ const colors = {
           </div>
         );
       // ------------------------------------
+
+      case 'todo_list': 
+        return (
+          <div 
+            // Use commonWrapperClass defined above, with a simple class extension
+            className={`${commonWrapperClass} p-0 h-fit`}
+            // Add required drag/drop props without comments
+            draggable={editMode}
+            onDragStart={(e) => handleDragStart(e, widgetId, 'left', 'home')}
+            onDrop={(e) => { e.stopPropagation(); handleDrop(e, 'left', 0, 'home'); }}
+            onDragOver={(e) => handleDragOver(e)}
+          >
+            {toggleBtn}{dragHandle}
+            <TodoList /> 
+          </div>
+        );
+      // ----------------------------
 
       case 'active_contracts': return (<div className={`${commonWrapperClass} p-0 h-fit`}>{toggleBtn}{dragHandle}<div className="p-4"><h3 className="text-xs font-bold text-slate-500 uppercase mb-4 flex items-center gap-2"><RenderIcon name="Flame" size={14}/> Active Contracts</h3><ContractWidget contracts={displayContracts} onToggle={toggleAchievement} title="" /></div></div>);
       case 'collection': return (<div className={`${commonWrapperClass} p-6 h-fit`}>{toggleBtn}{dragHandle}<CollectionBinder cards={data.cards} onSell={handleSellCard} /></div>);
@@ -613,7 +633,7 @@ const colors = {
                     {editMode && (
                        <div className="bg-[#1e1e1e] border border-slate-700 rounded-lg p-2 flex gap-2 mr-4 items-center shadow-xl animate-in fade-in zoom-in">
                           <div className="text-xs font-bold text-slate-400 px-2 uppercase tracking-wider border-r border-slate-700 mr-1">Interface Config</div>
-                          {['daily_ops', 'contract', 'skills', 'shop', 'productivity_timer', 'task_command_center'].map(k => (
+                          {['daily_ops', 'contract', 'skills', 'shop', 'productivity_timer', 'todolist', 'task_command_center'].map(k => (
                              <button key={k} onClick={() => toggleWidgetConfig(k)} className={`px-2 py-1 text-[10px] font-bold rounded uppercase ${data.widgetConfig[k] ? 'bg-emerald-900 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>{k.replace('_',' ')}</button>
                           ))}
                        </div>
