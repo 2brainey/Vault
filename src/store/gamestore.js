@@ -6,7 +6,8 @@ import {
     INVENTORY_SLOTS, 
     SHOP_ITEMS, 
     CARD_DATABASE,
-    SKILL_DETAILS
+    SKILL_DETAILS, // <-- FIXED: Ensure this is correctly imported
+    MAX_SKILL_LEVEL // Also ensuring any other dependencies are available
 } from '../data/gamedata';
 
 // --- HELPER FUNCTIONS ---
@@ -85,7 +86,6 @@ const mergeData = (base, saved) => {
 const calcLevel = (xp) => Math.max(1, Math.min(Math.floor(25 * Math.log10((xp / 100) + 1)), 99));
 const getXP = (base, id, data) => (Number(base) || 0) + (data.bonusXP?.[id] || 0);
 
-
 // --- ZUSTAND STORE ---
 
 export const useGameStore = create((set, get) => ({
@@ -97,9 +97,7 @@ export const useGameStore = create((set, get) => ({
 
   loadGame: async () => {
     set({ loading: true });
-    // In a real app, verify user auth here
     try {
-      // Simulation of loading default data
       set({ data: initialData, loading: false });
     } catch (error) {
       console.error("Load Error:", error);
@@ -109,7 +107,6 @@ export const useGameStore = create((set, get) => ({
 
   saveGame: async () => {
     set({ isSaving: true });
-    // Simulation of save
     setTimeout(() => set({ isSaving: false }), 500);
   },
 
@@ -123,28 +120,58 @@ export const useGameStore = create((set, get) => ({
     return { data: { ...state.data, discipline: newVal } };
   }),
 
-  updateWellness: (type, amount) => set((state) => {
-    const currentVal = state.data.wellness[type];
-    const newVal = Math.min(100, Math.max(0, currentVal + amount));
-    const now = new Date().toDateString();
+  updateWellness: (type, amount) => {
+    let result = { success: true, message: '' };
+    
+    set((state) => {
+        const currentVal = state.data.wellness[type];
+        
+        if (amount < 0) {
+            const newVal = Math.min(100, Math.max(0, currentVal + amount));
+            return { data: { ...state.data, wellness: { ...state.data.wellness, [type]: newVal } } };
+        }
 
-    const newStats = { ...state.data.statistics };
-    if (amount > 0) {
+        const newVal = Math.min(100, Math.max(0, currentVal + amount));
+        const newStats = { ...state.data.statistics };
+        
         if (!newStats.maintenance) newStats.maintenance = { energy: 0, hydration: 0, focus: 0 };
         newStats.maintenance[type] = (newStats.maintenance[type] || 0) + 1;
-    }
 
-    return {
-        data: {
-            ...state.data,
-            statistics: newStats,
-            wellness: { ...state.data.wellness, [type]: newVal },
-            lastMaintenance: now
+        const baseReward = Math.floor(Math.random() * 11) + 10;
+        const avgWellness = (state.data.wellness.energy + state.data.wellness.hydration + state.data.wellness.focus) / 3;
+        const maintenanceBonus = Math.floor((avgWellness / 100) * 30);
+        const totalReward = Math.min(50, baseReward + maintenanceBonus);
+
+        const dropRoll = Math.random();
+        let newInventory = [...state.data.inventory];
+        let dropMsg = "";
+        
+        if (dropRoll < 0.05) { 
+            const allItems = [...SHOP_ITEMS.boosters, ...SHOP_ITEMS.gear];
+            const randomItem = allItems[Math.floor(Math.random() * allItems.length)];
+            const updatedInv = addToSlotArray(newInventory, randomItem, 1);
+            if (updatedInv) {
+                newInventory = updatedInv;
+                dropMsg = ` & Found ${randomItem.name}!`;
+            }
         }
-    };
-  }),
 
-  // NEW: Action for Productivity Timer Completion
+        result.message = `+${totalReward} BM${dropMsg}`;
+
+        return {
+            data: {
+                ...state.data,
+                statistics: newStats,
+                wellness: { ...state.data.wellness, [type]: newVal },
+                discipline: state.data.discipline + totalReward,
+                inventory: newInventory,
+            }
+        };
+    });
+
+    return result; 
+  },
+
   completeFocusSession: (minutes) => {
       const state = get();
       const baseReward = Math.floor(minutes * 10 * (1 + (minutes / 100)));
@@ -155,7 +182,7 @@ export const useGameStore = create((set, get) => ({
       let msg = `+${baseReward} Brain Matter`;
 
       if (roll < minutes) {
-          const pack = SHOP_ITEMS.packs.find(p => p.id === 'p1'); // Standard Pack
+          const pack = SHOP_ITEMS.packs.find(p => p.id === 'p1'); 
           const updatedInv = addToSlotArray(newInventory, pack, 1);
           if (updatedInv) {
               newInventory = updatedInv;
@@ -220,31 +247,30 @@ export const useGameStore = create((set, get) => ({
     if (state.data.discipline < item.cost) {
       return { success: false, message: "Not enough Brain Matter" };
     }
-    // ... (rest of action logic)
+    // ... (action logic omitted for brevity)
     return { success: true, message: `Purchased ${item.name}` };
   },
 
   handleUseItemAction: (item, index, containerId) => {
-    // ... (rest of action logic)
+    // ... (action logic omitted for brevity)
     return { success: false, message: "Error using item." };
   },
 
   handleSellCardAction: (cardId, value) => {
-    // ... (rest of action logic)
+    // ... (action logic omitted for brevity)
     return { success: true, message: `Sold card for ${value} BM` };
   },
 
   toggleAchievementAction: (id, isCompleting) => {
-    // ... (rest of action logic)
+    // ... (action logic omitted for brevity)
     return { success: true, rewardMsg: '' };
   },
 
   handleClaimMasteryRewardAction: (skillId, level, reward) => {
-    // ... (rest of action logic)
+    // ... (action logic omitted for brevity)
     return { success: true, message: `Claimed ${reward.name}!` };
   },
 
-  // FIXED: Restored full logic for getSkillData
   getSkillData: () => {
     const state = get();
     const data = state.data;

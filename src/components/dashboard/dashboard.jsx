@@ -30,6 +30,7 @@ export default function VaultDashboard() {
   // --- UI STATE ---
   const [activeTab, setActiveTab] = useState('dynamic'); 
   const [isTodoCollapsed, setIsTodoCollapsed] = useState(false);
+  const [isRightCollapsed, setIsRightCollapsed] = useState(false);
   const [isKanbanExpanded, setIsKanbanExpanded] = useState(false);
   const [rightPanelTab, setRightPanelTab] = useState('skills');
   const [leftPanelWidth, setLeftPanelWidth] = useState(288);
@@ -41,6 +42,7 @@ export default function VaultDashboard() {
   const [toast, setToast] = useState(null);
   const [packOpening, setPackOpening] = useState(null);
   const [dragItem, setDragItem] = useState(null);
+
   const [vaultSubTab, setVaultSubTab] = useState('profile');
   const [analyticsSubTab, setAnalyticsSubTab] = useState('stats');
 
@@ -54,6 +56,12 @@ export default function VaultDashboard() {
   const handleSellCard = (id, val) => { const r = handleSellCardAction(id, val); showToast(r.message, r.success?'success':'error'); };
   const toggleAchievement = (id) => { const r = toggleAchievementAction(id, !data.achievements.find(a=>a.id===id).completed); if(r.success) showToast(r.rewardMsg || 'Updated', 'success'); };
   const handleClaimMasteryReward = (sId, lvl, rwd) => { const r = handleClaimMasteryRewardAction(sId, lvl, rwd); if(r.success) { setSkillModal(null); showToast(r.message, 'success'); } else showToast(r.message, 'error'); };
+  
+  const handleMaintainVital = (type) => {
+      const result = updateWellness(type, 20);
+      if (result && result.message) showToast(result.message, 'success');
+  };
+
   const updateAsset = (key, value) => {
     const val = parseInt(value) || 0;
     const oldVal = data.assets[key] || 0;
@@ -81,7 +89,6 @@ export default function VaultDashboard() {
       const tl = Object.values(data.liabilities || {}).reduce((a,b)=>Number(a)+Number(b),0);
       return { netWorth: ta-tl, monthlyCashFlow: data.monthlyIncome-data.monthlyExpenses };
   }, [data]);
-  // FIXED: getSkillData dependency corrected in previous step.
   const { calculatedSkills: playerSkills, totalXPs } = useMemo(() => getSkillData(), [data, getSkillData]);
   const combatStats = useMemo(() => ({ totalLevel: playerSkills.reduce((s,x)=>s+x.level,0), combatLevel: Math.floor(playerSkills.reduce((s,x)=>s+x.level,0)/4) }), [playerSkills]);
 
@@ -138,7 +145,7 @@ export default function VaultDashboard() {
                     {location === 'center' && (
                         <button onClick={(e) => { e.stopPropagation(); cycleWidgetSize(widgetId); }} className="p-1 bg-black/50 rounded text-white hover:bg-black" title="Resize Widget (Cycle Width)"><RenderIcon name="Maximize" size={12}/></button>
                     )}
-                    <button onClick={(e) => { e.stopPropagation(); updateData(p => ({ widgetConfig: { ...p.widgetConfig, [widgetId]: !p.widgetConfig[widgetId] } })); }} className="p-1 bg-black/50 rounded text-white hover:bg-black" title={isVisible ? "Hide Widget" : "Show Widget"}><RenderIcon name={isVisible ? "Eye" : "EyeOff"} size={12}/></button>
+                    <button onClick={(e) => { e.stopPropagation(); updateData(p => ({ widgetConfig: { ...p.widgetConfig, [widgetId]: !p.widgetConfig[widgetId] } })); }} className="p-1 bg-black/50 rounded text-white hover:bg-black" title="Toggle Visibility"><RenderIcon name={isVisible ? "Eye" : "EyeOff"} size={12}/></button>
                 </div>
             )}
             {children}
@@ -157,12 +164,15 @@ export default function VaultDashboard() {
 
   return (
     <div className="min-h-screen text-slate-200 font-sans bg-vault-dark flex flex-col">
-      {/* Toast, Modals (omitted for brevity) */}
+      {toast && <div className="fixed top-20 right-4 z-50 bg-[#232a3a] border border-amber-500 text-white px-4 py-3 rounded shadow-xl"><RenderIcon name="Zap" size={16} className="text-amber-500" /> <span className="text-sm font-bold">{toast.msg}</span></div>}
       
-      {/* HEADER: TWO-ROW STICKY CONTAINER FIX */}
+      {/* Mastery Modal */}
+      {skillModal && <MasteryModal skill={skillModal} onClose={() => setSkillModal(null)} onClaimReward={handleClaimMasteryReward} claimedLevels={data.lifetime.claimedMasteryRewards[skillModal.id] || []}/>}
+
+      {/* HEADER */}
       <div className="sticky top-0 z-40 bg-[#2b3446] border-b border-[#404e6d] shadow-xl">
           
-          {/* Row 1: Title, Currency, and Main Tabs */}
+          {/* Row 1: Title, Currency, Tabs */}
           <header className="w-full max-w-6xl mx-auto p-4 flex justify-between items-center">
              <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('dynamic')}>
                 <RenderIcon name="Shield" size={28} className="text-amber-500" />
@@ -182,9 +192,9 @@ export default function VaultDashboard() {
              </nav>
           </header>
 
-          {/* Row 2: Vitals Monitor Strip (Dedicated Row) */}
+          {/* Row 2: Vitals Monitor (Centered) */}
           <div className="w-full bg-[#131313] border-t border-[#404e6d] py-2">
-              <div className="w-full max-w-6xl mx-auto flex justify-end px-4">
+              <div className="w-full max-w-6xl mx-auto flex justify-center px-4">
                   <div className="flex items-center space-x-4">
                       {[{l:'Energy', i:'Zap', c:'text-yellow-400', k:'energy'}, {l:'Hydration', i:'Droplet', c:'text-blue-400', k:'hydration'}, {l:'Focus', i:'Brain', c:'text-purple-400', k:'focus'}]
                        .map(v => (
@@ -192,7 +202,7 @@ export default function VaultDashboard() {
                                <RenderIcon name={v.i} size={16} className={v.c} />
                                <span className="text-sm font-mono text-white font-bold">{data.wellness[v.k]}%</span>
                                <button 
-                                 onClick={() => updateWellness(v.k, 20)} 
+                                 onClick={() => handleMaintainVital(v.k)} 
                                  className="bg-slate-700 hover:bg-slate-600 rounded px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-slate-600 transition"
                                >
                                  +20
@@ -206,10 +216,9 @@ export default function VaultDashboard() {
       </div>
 
       <main className="flex-1 overflow-hidden relative">
-        {/* --- HOME TAB --- */}
         {activeTab === 'dynamic' && (
             <div className="flex h-[calc(100vh-80px)] overflow-hidden">
-                {/* 1. LEFT: COLLAPSIBLE & RESIZABLE TODO */}
+                {/* 1. LEFT: COLLAPSIBLE TODO */}
                 <div className={`transition-colors duration-100 border-r border-slate-700 bg-[#161b22] relative flex flex-col shrink-0 ${isTodoCollapsed ? 'w-12' : ''}`} style={{ width: isTodoCollapsed ? '3rem' : `${leftPanelWidth}px` }}>
                     <div className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-slate-600/50 z-20" onMouseDown={(e)=>{e.preventDefault(); setIsResizing('left')}}/>
                     <button onClick={() => setIsTodoCollapsed(!isTodoCollapsed)} className="absolute -right-3 top-4 bg-slate-700 text-white p-1 rounded-full z-10 border border-slate-500"><RenderIcon name={isTodoCollapsed ? "ChevronRight" : "ChevronLeft"} size={12}/></button>
@@ -218,7 +227,7 @@ export default function VaultDashboard() {
                     </div>
                 </div>
 
-                {/* 2. CENTER: 3-COLUMN GRID + EDIT MODE CONTROLS */}
+                {/* 2. CENTER: GRID */}
                 <div className="flex-1 overflow-y-auto p-6 bg-[#0f1219]">
                     <div className="flex justify-end mb-4"><button onClick={() => setEditMode(!editMode)} className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold border ${editMode ? 'bg-amber-500 text-black' : 'bg-transparent text-slate-400'}`}><RenderIcon name="Edit3" size={14}/> {editMode ? 'DONE' : 'EDIT LAYOUT'}</button></div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
@@ -226,18 +235,31 @@ export default function VaultDashboard() {
                     </div>
                 </div>
 
-                {/* 3. RIGHT: PERMANENT RESIZABLE PANEL */}
-                <div className="bg-[#1a1a1a] border-l border-slate-700 flex flex-col shrink-0 relative" style={{ width: `${rightPanelWidth}px` }}>
+                {/* 3. RIGHT: COLLAPSIBLE & RESIZABLE PANEL */}
+                <div className={`bg-[#1a1a1a] border-l border-slate-700 flex flex-col shrink-0 relative transition-all duration-100 z-30 ${isRightCollapsed ? 'w-12' : ''}`} style={{ width: isRightCollapsed ? '3rem' : `${rightPanelWidth}px` }}>
                     <div className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-slate-600/50 z-20" onMouseDown={(e)=>{e.preventDefault(); setIsResizing('right')}}/>
-                    <div className="p-2 border-b border-slate-800 bg-[#131313] flex justify-center sticky top-0 z-10 gap-1">{['skills', 'inventory'].map(t => <button key={t} onClick={() => setRightPanelTab(t)} className={`flex-1 py-2 text-xs font-bold uppercase rounded ${rightPanelTab===t ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white'}`}>{t}</button>)}</div>
-                    <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
-                        {rightPanelTab === 'skills' && playerSkills.map(skill => (<div key={skill.id} onClick={() => setSkillModal({ ...skill, currentXP: totalXPs[skill.id] })} className="flex justify-between items-center text-xs p-2 bg-black/40 rounded border border-slate-800 cursor-pointer hover:bg-slate-700"><div className="flex items-center gap-2 text-slate-300"><RenderIcon name={skill.iconName} size={14} className={skill.color}/> {skill.name}</div><div className="font-mono">Lvl {skill.level}</div></div>))}
-                        {rightPanelTab === 'inventory' && <InventoryGrid slots={data.inventory} mp={data.discipline} onUseItem={handleUseItem} containerId="inventory" />}
+                    <button onClick={() => setIsRightCollapsed(!isRightCollapsed)} className="absolute -left-3 top-4 bg-slate-700 text-white p-1 rounded-full z-30 border border-slate-500"><RenderIcon name={isRightCollapsed ? "ChevronLeft" : "ChevronRight"} size={12}/></button>
+                    <div className={`flex-1 flex flex-col overflow-hidden ${isRightCollapsed ? 'opacity-0' : 'opacity-100'}`}>
+                        <div className="p-2 border-b border-slate-800 bg-[#131313] flex justify-center sticky top-0 z-10 gap-1">{['skills', 'inventory'].map(t => <button key={t} onClick={() => setRightPanelTab(t)} className={`flex-1 py-2 text-xs font-bold uppercase rounded ${rightPanelTab===t ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white'}`}>{t}</button>)}</div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
+                            {rightPanelTab === 'skills' && playerSkills.map(skill => (
+                                <div 
+                                    key={skill.id} 
+                                    // FIXED: Merge static SKILL_DETAILS with dynamic data/XP before setting modal
+                                    onClick={() => setSkillModal({ ...SKILL_DETAILS[skill.id], ...skill, currentXP: totalXPs[skill.id] })} 
+                                    className="flex justify-between items-center text-xs p-2 bg-black/40 rounded border border-slate-800 cursor-pointer hover:bg-slate-700">
+                                        <div className="flex items-center gap-2 text-slate-300"><RenderIcon name={skill.iconName} size={14} className={skill.color}/> {skill.name}</div><div className="font-mono">Lvl {skill.level}</div>
+                                </div>
+                            ))}
+                            {rightPanelTab === 'inventory' && <InventoryGrid slots={data.inventory} mp={data.discipline} onUseItem={handleUseItem} containerId="inventory" />}
+                        </div>
                     </div>
+                    {isRightCollapsed && <div className="pt-4 flex flex-col items-center gap-4 text-slate-500"><RenderIcon name="Layers" size={24} /></div>}
                 </div>
             </div>
         )}
 
+        {/* VAULT TAB */}
         {activeTab === 'vault' && (
             <div className="flex h-full">
                 <div className="w-56 bg-[#131313] border-r border-slate-700 p-2 flex flex-col gap-1">
@@ -253,6 +275,7 @@ export default function VaultDashboard() {
             </div>
         )}
 
+        {/* ANALYTICS TAB */}
         {activeTab === 'analytics' && (
             <div className="flex h-full">
                 <div className="w-56 bg-[#131313] border-r border-slate-700 p-2 flex flex-col gap-1">
