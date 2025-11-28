@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avatar Universe Battler</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Herculanum&family=Papyrus&family=Roboto:wght@400;700;900;100&display=swap');
+
+        /* ATLA Theming Fonts */
+        h1, h2, h3, .font-display {
+            font-family: 'Herculanum', 'Papyrus', fantasy;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #1c1917; /* Stone 900 */
+            color: #f5f5f4; /* Stone 100 */
+        }
+
+        /* --- CARD STYLES FOR BATTLE ARENA --- */
+        .card {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            border-radius: 12px;
+        }
+
+        /* Battle Card States */
+        .card.inactive {
+            opacity: 0.25;
+            filter: grayscale(80%);
+            transform: scale(0.9);
+        }
+        
+        .card.active-duelist {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            z-index: 10;
+            border-color: white !important;
+        }
+        
+        .card.dead {
+            opacity: 0.4;
+            filter: grayscale(100%);
+            transform: scale(0.95);
+        }
+
+        .card.attacking {
+            animation: lunge 0.3s ease-in-out;
+            z-index: 20;
+        }
+
+        .card.hit {
+            animation: shake 0.3s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        /* Elemental Themes (ATLA Colors) - Battle Arena Cards */
+        .fire-theme { border-color: #b91c1c; background: linear-gradient(135deg, #450a0a, #7f1d1d); box-shadow: 0 0 10px rgba(185, 28, 28, 0.4); }
+        .water-theme { border-color: #0284c7; background: linear-gradient(135deg, #0c4a6e, #0369a1); box-shadow: 0 0 10px rgba(2, 132, 199, 0.4); }
+        .earth-theme { border-color: #15803d; background: linear-gradient(135deg, #14532d, #166534); box-shadow: 0 0 10px rgba(21, 128, 61, 0.4); }
+        .air-theme { border-color: #f59e0b; background: linear-gradient(135deg, #78350f, #d97706); box-shadow: 0 0 10px rgba(245, 158, 11, 0.4); }
+
+        /* Rarity Borders - Battle Arena Cards */
+        .rarity-common { border-width: 2px; border-style: solid; border-color: #a8a29e; }
+        .rarity-rare { border-width: 3px; border-style: double; border-color: #60a5fa; }
+        .rarity-epic { border-width: 3px; border-style: solid; border-color: #a855f7; box-shadow: 0 0 15px rgba(168, 85, 247, 0.5); }
+        .rarity-legendary { border-width: 4px; border-style: ridge; border-color: #fbbf24; box-shadow: 0 0 20px rgba(234, 179, 8, 0.7); }
+        
+        /* MYTHIC STYLE (Rainbow/Cosmic) */
+        .rarity-mythic {
+            border-width: 4px;
+            border-style: solid;
+            border-image: linear-gradient(45deg, #ff00cc, #3333ff, #00ffcc) 1;
+            box-shadow: 0 0 25px rgba(255, 0, 204, 0.6);
+            animation: mythicPulse 3s infinite;
+        }
+
+        @keyframes mythicPulse {
+            0% { box-shadow: 0 0 15px rgba(255, 0, 204, 0.4); }
+            50% { box-shadow: 0 0 30px rgba(0, 255, 204, 0.8); }
+            100% { box-shadow: 0 0 15px rgba(255, 0, 204, 0.4); }
+        }
+
+        /* Animations */
+        @keyframes lunge {
+            0% { transform: translateY(0) scale(1.05); }
+            50% { transform: translateY(-30px) scale(1.15); }
+            100% { transform: translateY(0) scale(1.05); }
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        @keyframes floatDamage {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-50px) scale(1.5); }
+        }
+
+        .damage-number {
+            position: absolute;
+            top: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ef4444;
+            font-weight: 900;
+            font-size: 1.5rem;
+            text-shadow: 2px 2px 0 #000;
+            pointer-events: none;
+            animation: floatDamage 1s forwards;
+            z-index: 50;
+        }
+        
+        .crit-text { color: #fbbf24; font-size: 1.8rem; }
+
+        /* Custom Scrollbar */
+        .log-container::-webkit-scrollbar { width: 8px; }
+        .log-container::-webkit-scrollbar-track { background: #292524; }
+        .log-container::-webkit-scrollbar-thumb { background: #57534e; border-radius: 4px; }
+        
+        /* Overlays (Dev Panel & Library) */
+        .overlay-panel {
+            position: fixed;
+            top: 64px;
+            left: 0;
+            width: 100%;
+            height: calc(100vh - 64px);
+            background-color: rgba(28, 25, 23, 0.98);
+            z-index: 40;
+            overflow-y: auto;
+            transform: translateY(100%);
+            transition: transform 0.3s ease-in-out;
+            padding: 2rem;
+        }
+        .overlay-panel.active { transform: translateY(0); }
+
+        /* --- LIBRARY CARD REDESIGN STYLES --- */
+        .lib-card {
+            border: 4px solid;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+        .lib-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.7);
+        }
+
+        /* Rarity Borders for Library Cards */
+        .lib-common { border-color: #a8a29e; } /* Stone */
+        .lib-rare { border-color: #60a5fa; } /* Blue */
+        .lib-epic { border-color: #a855f7; } /* Purple */
+        .lib-legendary { border-color: #fbbf24; } /* Gold */
+        .lib-mythic { 
+            border-width: 5px;
+            border-image: linear-gradient(45deg, #ff00cc, #3333ff, #00ffcc) 1; 
+            animation: mythicPulse 3s infinite;
+        }
+
+        /* Elemental Backgrounds for Library Cards */
+        .lib-bg-Fire { background-color: #7f1d1d; } /* Dark Red */
+        .lib-bg-Water { background-color: #0369a1; } /* Dark Blue */
+        .lib-bg-Earth { background-color: #166534; } /* Dark Green */
+        .lib-bg-Air { background-color: #d97706; } /* Dark Orange */
+
+        /* Center Graphic */
+        .lib-center-graphic {
+            background-color: #f5f5f4; /* Near white for graphic background */
+            padding: 0.5rem;
+            border-radius: 9999px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+        }
+
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden bg-stone-900">
+
+    <!-- Developer Panel -->
+    <div id="dev-panel" class="overlay-panel" style="width: 300px; transform: translateX(-100%); left:0; top:64px;">
+        <h3 class="text-xl font-display mb-4 text-orange-400 border-b border-stone-600 pb-2">⚙️ Balance Config</h3>
+        <div class="mb-6">
+            <h4 class="text-sm font-bold text-blue-300 mb-2 uppercase tracking-widest">Elemental Advantages</h4>
+            <div id="type-chart-inputs" class="space-y-3"></div>
+        </div>
+        <div class="mb-6 border-t border-stone-600 pt-4">
+            <h4 class="text-sm font-bold text-yellow-300 mb-2 uppercase tracking-widest">Rarity Multipliers</h4>
+            <div id="rarity-mult-inputs" class="space-y-3"></div>
+        </div>
+        <button onclick="game.saveConfig()" class="w-full bg-orange-700 hover:bg-orange-600 text-white font-bold py-2 rounded shadow transition sticky bottom-0">
+            Save & Reset
+        </button>
+    </div>
+
+    <!-- Library Modal -->
+    <div id="library-panel" class="overlay-panel bg-stone-900/95 backdrop-blur-lg">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex justify-between items-center mb-6 border-b border-stone-700 pb-4">
+                <h2 class="text-4xl font-display text-white tracking-widest">Card Archives</h2>
+                <button onclick="game.toggleLibrary()" class="text-stone-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            
+            <!-- Filters, Sorts, and View Toggle -->
+            <div class="flex flex-col justify-between items-center mb-4 gap-4">
+                <!-- View Toggle -->
+                <div class="flex gap-2 justify-center flex-wrap w-full border-b border-stone-700 pb-3">
+                    <span class="text-stone-400 text-sm">View Mode:</span>
+                    <button onclick="game.setViewMode('list')" class="px-3 py-1 rounded-full bg-teal-700 text-white text-sm hover:bg-teal-600">List View</button>
+                    <button onclick="game.setViewMode('card')" class="px-3 py-1 rounded-full bg-stone-700 text-white text-sm hover:bg-stone-600">Card View</button>
+                </div>
+
+                <!-- Elemental Filters -->
+                <div class="flex gap-2 justify-center flex-wrap w-full">
+                    <span class="text-stone-400 text-sm">Filter Element:</span>
+                    <button onclick="game.renderLibrary('All')" class="px-3 py-1 rounded-full bg-stone-700 text-white text-sm hover:bg-stone-600">All Cards</button>
+                    <button onclick="game.renderLibrary('Fire')" class="px-3 py-1 rounded-full bg-red-900/50 hover:bg-red-800 border border-red-700 text-red-200 text-sm">Fire 🔥</button>
+                    <button onclick="game.renderLibrary('Water')" class="px-3 py-1 rounded-full bg-blue-900/50 hover:bg-blue-800 border border-blue-700 text-blue-200 text-sm">Water 🌊</button>
+                    <button onclick="game.renderLibrary('Earth')" class="px-3 py-1 rounded-full bg-green-900/50 hover:bg-green-800 border border-green-700 text-green-200 text-sm">Earth ⛰️</button>
+                    <button onclick="game.renderLibrary('Air')" class="px-3 py-1 rounded-full bg-yellow-900/50 hover:bg-yellow-800 border border-yellow-700 text-yellow-200 text-sm">Air 🌪️</button>
+                </div>
+                
+                <!-- Subtype Filters -->
+                <div class="flex gap-2 justify-center flex-wrap w-full">
+                    <span class="text-stone-400 text-sm">Filter Subtype:</span>
+                    <button onclick="game.renderLibrary('Metalbending')" class="px-3 py-1 rounded-full bg-stone-700/50 border border-stone-600 text-stone-300 text-sm hover:bg-stone-600">Metalbending</button>
+                    <button onclick="game.renderLibrary('Lavabending')" class="px-3 py-1 rounded-full bg-stone-700/50 border border-stone-600 text-stone-300 text-sm hover:bg-stone-600">Lavabending</button>
+                    <button onclick="game.renderLibrary('Bloodbending')" class="px-3 py-1 rounded-full bg-stone-700/50 border border-stone-600 text-stone-300 text-sm hover:bg-stone-600">Bloodbending</button>
+                    <button onclick="game.renderLibrary('Combustion')" class="px-3 py-1 rounded-full bg-stone-700/50 border border-stone-600 text-stone-300 text-sm hover:bg-stone-600">Combustion</button>
+                </div>
+                
+                <!-- Sorting Controls -->
+                <div class="flex gap-2 justify-center flex-wrap pt-4 border-t border-stone-700 w-full">
+                    <span class="text-stone-400 text-sm">Sort By:</span>
+                    <!-- New P-Rating sort option -->
+                    <button onclick="game.sortLibrary('pRating')" class="sort-btn px-3 py-1 rounded-full bg-stone-700 hover:bg-stone-600 text-white text-sm">P-Rating</button>
+                    <button onclick="game.sortLibrary('maxHp')" class="sort-btn px-3 py-1 rounded-full bg-stone-700 hover:bg-stone-600 text-white text-sm">HP</button>
+                    <button onclick="game.sortLibrary('atk')" class="sort-btn px-3 py-1 rounded-full bg-stone-700 hover:bg-stone-600 text-white text-sm">ATK</button>
+                    <button onclick="game.sortLibrary('spd')" class="sort-btn px-3 py-1 rounded-full bg-stone-700 hover:bg-stone-600 text-white text-sm">SPD</button>
+                    <button onclick="game.sortLibrary('rarity')" class="sort-btn px-3 py-1 rounded-full bg-stone-700 hover:bg-stone-600 text-white text-sm">Rarity</button>
+                </div>
+            </div>
+            
+            <!-- List View Header (Visible only in List Mode) -->
+            <div id="library-list-header" class="hidden md:grid grid-cols-7 text-xs font-bold uppercase tracking-widest text-stone-400 border-b border-stone-600 pb-2 mb-2 px-4">
+                <span class="col-span-2">Character / Element</span>
+                <span>Class</span> <!-- NEW HEADER -->
+                <span>P-Rating</span>
+                <span>Rarity</span>
+                <span>HP</span>
+                <span>ATK / SPD</span>
+            </div>
+            
+            <!-- Library Content Container -->
+            <div id="library-content" class="space-y-3">
+                <!-- Cards Injected Here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="h-16 bg-stone-800 border-b border-stone-700 flex items-center justify-between px-6 shadow-lg z-20">
+        <div class="flex items-center gap-3">
+            <div class="text-2xl filter drop-shadow">🌊🪨🔥🌪️</div>
+            <h1 class="text-2xl font-bold tracking-widest text-orange-500 uppercase hidden md:block" style="text-shadow: 2px 2px 4px black;">Avatar Battler</h1>
+        </div>
+        <div class="flex flex-wrap gap-3 items-center">
+            <button onclick="game.toggleLibrary()" class="bg-stone-700 hover:bg-stone-600 text-stone-200 font-bold py-1 px-3 rounded transition text-xs uppercase tracking-wide border border-stone-500 flex items-center gap-1">
+                📜 Library
+            </button>
+            <button onclick="game.toggleDevPanel()" class="text-stone-400 hover:text-white font-bold py-1 px-2 rounded transition text-xs uppercase tracking-wide">
+                ⚙️
+            </button>
+            <div id="turn-counter" class="bg-stone-700 px-4 py-1 rounded font-mono text-sm border border-stone-600 text-stone-300">Turn: 0</div>
+            
+            <!-- SHUFFLE BUTTON -->
+            <button onclick="game.startBattle()" id="shuffle-btn" class="bg-gradient-to-r from-teal-700 to-cyan-600 hover:from-teal-600 hover:to-cyan-500 text-white font-bold py-1 px-6 rounded shadow transition transform hover:scale-105 uppercase tracking-wider font-display border border-teal-900">
+                Shuffle Matchup
+            </button>
+            
+            <button onclick="game.toggleAuto()" id="auto-btn" class="bg-stone-700 hover:bg-stone-600 text-white font-bold py-1 px-4 rounded border border-stone-600 transition text-sm">
+                Auto
+            </button>
+            <button onclick="game.nextTurn()" id="next-btn" class="bg-blue-700 hover:bg-blue-600 text-white font-bold py-1 px-4 rounded shadow transition disabled:opacity-50 disabled:cursor-not-allowed border border-blue-900 text-sm">
+                ⏩
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Game Area -->
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Battle Arena -->
+        <div class="flex-1 relative flex flex-col p-6 gap-2 bg-stone-900">
+            <!-- Background Pattern Layer (Fallback safe) -->
+            <div class="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/black-scales.png')] pointer-events-none"></div>
+            
+            <!-- ENEMY TEAM (TOP) -->
+            <div class="flex-1 flex items-end justify-center gap-6 pb-4 z-10" id="enemy-container"></div>
+
+            <!-- VS / SCOREBOARD -->
+            <div class="h-16 flex items-center justify-center opacity-90 z-10">
+                <div class="bg-black/60 backdrop-blur-md border-y border-stone-500 w-full flex justify-center items-center py-2 relative">
+                    <div class="absolute left-10 text-red-400 font-display text-xl tracking-widest hidden md:block">RED LOTUS</div>
+                    
+                    <div class="flex items-center gap-6">
+                        <span id="score-player" class="text-5xl font-display text-green-500 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">0</span>
+                        <span class="text-stone-500 text-xs uppercase tracking-widest px-2">Best of 3</span>
+                        <span id="score-enemy" class="text-5xl font-display text-red-500 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">0</span>
+                    </div>
+
+                    <div class="absolute right-10 text-green-400 font-display text-xl tracking-widest hidden md:block">TEAM AVATAR</div>
+                </div>
+            </div>
+
+            <!-- PLAYER TEAM (BOTTOM) -->
+            <div class="flex-1 flex items-start justify-center gap-6 pt-4 z-10" id="player-container"></div>
+
+            <!-- Overlay for Winner -->
+            <div id="winner-overlay" class="hidden absolute inset-0 bg-black/90 z-50 flex items-center justify-center backdrop-blur-md">
+                <div class="text-center">
+                    <h2 id="winner-text" class="text-7xl font-display mb-2 text-yellow-500 drop-shadow-[0_5px_5px_rgba(0,0,0,0.8)] tracking-widest">VICTORY</h2>
+                    <p id="winner-subtext" class="text-stone-400 mb-8 text-xl font-display">Harmony Restored</p>
+                    <button onclick="game.startBattle()" class="bg-stone-200 text-stone-900 font-bold py-3 px-10 rounded hover:bg-white transition text-xl uppercase tracking-widest font-display">
+                        Rematch
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar / Logs -->
+        <aside class="w-80 bg-stone-800 border-l border-stone-700 flex flex-col shadow-2xl z-10 hidden lg:flex">
+            <div class="p-4 border-b border-stone-700 font-bold bg-stone-900/50 flex justify-between items-center text-orange-500 font-display tracking-wide">
+                <h3>Scroll of Truth</h3>
+                <span class="text-[10px] text-stone-500 font-sans">LOG</span>
+            </div>
+            <div id="battle-log" class="flex-1 overflow-y-auto p-4 space-y-2 text-sm font-mono log-container bg-stone-900/30">
+                <div class="text-stone-500 italic text-center mt-10">Use "Shuffle Matchup" to begin...</div>
+            </div>
+            
+            <!-- Synergy Info Panel -->
+            <div class="p-4 border-t border-stone-700 bg-stone-900/80">
+                <h4 class="text-[10px] font-bold uppercase text-stone-500 mb-2 tracking-widest">Elemental Harmony</h4>
+                <div id="synergy-list" class="space-y-1 text-xs font-mono"></div>
+            </div>
+        </aside>
+
+    </main>
+
+    <script>
+        // ==========================================
+        // CONFIG & DATABASE
+        // ==========================================
+        
+        const ELEMENTS = ["Fire", "Water", "Earth", "Air"];
+        const RARITIES = ["Common", "Rare", "Epic", "Legendary", "Mythic"];
+        const SUBTYPES = ["Metalbending", "Lavabending", "Bloodbending", "Combustion"];
+        const CLASSES = ["Aggressor", "Defender", "Controller", "Utility"]; // NEW: Core Archetypes
+        const ICONS = { 
+            "Fire": "🔥", "Water": "🌊", "Earth": "⛰️", "Air": "🌪️", 
+            "HP": "💚", "ATK": "⚔️", "SPD": "⏩",
+            "Aggressor": "💥", "Defender": "🛡️", "Controller": "🌀", "Utility": "✨" 
+        };
+        
+        // CHARACTER DATABASE (Merged ATLA & LOK)
+        const CHARACTER_DB = [
+            // --- MYTHIC (Power 10+) ---
+            { name: "Aang", element: "Air", power: 10.0, notes: "Master of all 4 elements; Avatar State" },
+            { name: "Roku", element: "Fire", power: 10.0, notes: "Fully realized Avatar; Lava control" },
+            { name: "Kyoshi", element: "Earth", power: 10.0, notes: "Created Kyoshi Island; Immense raw power" },
+            { name: "Yangchen", element: "Air", power: 10.0, notes: "Legendary Air Nomad; Peace through strength" },
+            { name: "Korra", element: "Water", power: 10.0, notes: "First Metalbending Avatar; Energybending", subtype: "Metalbending" },
+            { name: "Amon (Noatak)", element: "Water", power: 10.0, notes: "Psychic Bloodbending; Removes bending", subtype: "Bloodbending" },
+            { name: "Kuruk", element: "Water", power: 9.5, notes: "Hunter of dark spirits" },
+
+            // --- LEGENDARY (Power 9.0 - 9.9) ---
+            { name: "Ozai", element: "Fire", power: 9.8, notes: "The Phoenix King" },
+            { name: "Iroh", element: "Fire", power: 9.8, notes: "Dragon of the West" },
+            { name: "Bumi", element: "Earth", power: 9.5, notes: "Retook Omashu single-handedly" },
+            { name: "Toph Beifong", element: "Earth", power: 9.5, notes: "Inventor of Metalbending", subtype: "Metalbending" },
+            { name: "Monk Gyatso", element: "Air", power: 9.5, notes: "Aang's teacher; Defeated comet firebenders" },
+            { name: "Tenzin", element: "Air", power: 9.5, notes: "Most skilled technical airbender; Held off Red Lotus" },
+            { name: "Unalaq", element: "Water", power: 9.5, notes: "Dark Avatar; Spiritbending master" },
+            
+            { name: "Katara", element: "Water", power: 9.2, notes: "Greatest waterbending master; Bloodbending", subtype: "Bloodbending" },
+            { name: "Kuvira", element: "Earth", power: 9.2, notes: "The Great Uniter; Metal strips precision", subtype: "Metalbending" },
+            { name: "P'Li", element: "Fire", power: 9.2, notes: "Red Lotus; Curved combustion blasts", subtype: "Combustion" },
+            { name: "Ghazan", element: "Earth", power: 9.0, notes: "Red Lotus; Lavabending master", subtype: "Lavabending" },
+
+            { name: "Azula", element: "Fire", power: 9.0, notes: "Tactical genius; Blue fire" },
+            { name: "Jeong Jeong", element: "Fire", power: 9.0, notes: "Fire walls; Defensive master" },
+            { name: "Sozin", element: "Fire", power: 9.0, notes: "Started the war; Heat redirection" },
+            { name: "The Big Badgermole", element: "Earth", power: 9.0, notes: "Original Earthbender" },
+            { name: "Master Pakku", element: "Water", power: 9.0, notes: "Top master of the North" },
+            { name: "Ming-Hua", element: "Water", power: 9.0, notes: "Red Lotus; Armless water tentacles" },
+            { name: "Zaheer", element: "Air", power: 9.0, notes: "Red Lotus; Unlocked true Flight (Void)" },
+
+            // --- EPIC (Power 8.0 - 8.9) ---
+            { name: "Ming-Hua", element: "Water", power: 8.8, notes: "Red Lotus; Armless style" },
+            
+            { name: "Zuko", element: "Fire", power: 8.5, notes: "Dancing Dragon style; High durability" },
+            { name: "Combustion Man", element: "Fire", power: 8.5, notes: "Sniper-shot explosions", subtype: "Combustion" },
+            { name: "Lin Beifong", element: "Earth", power: 8.5, notes: "Metal Police; Cables for mobility", subtype: "Metalbending" },
+            { name: "Suyin Beifong", element: "Earth", power: 8.5, notes: "Metal Dancer; Fluid style", subtype: "Metalbending" },
+            { name: "Bolin", element: "Earth", power: 8.5, notes: "Pro-bender; Lavabending", subtype: "Lavabending" },
+            { name: "Hama", element: "Water", power: 8.5, notes: "Inventor of Bloodbending", subtype: "Bloodbending" },
+
+            { name: "P'Li", element: "Fire", power: 8.0, notes: "Red Lotus" }, 
+            { name: "Mako", element: "Fire", power: 8.0, notes: "Pro-bender; Instant Lightning" },
+            { name: "Tarrlok", element: "Water", power: 8.0, notes: "Master Bloodbender (requires hands)", subtype: "Bloodbending" },
+            { name: "Appa", element: "Air", power: 8.0, notes: "Sky Bison; Original Airbender" },
+
+            // --- RARE (Power 6.0 - 7.9) ---
+            { name: "Iroh II", element: "Fire", power: 7.5, notes: "Zuko's grandson; Iron Man flight" },
+            { name: "Huu", element: "Water", power: 7.5, notes: "Swamp Monster; Plantbending" },
+            { name: "Kya", element: "Water", power: 7.5, notes: "Katara's daughter; Healer/Fighter" },
+            { name: "Jinora", element: "Air", power: 7.5, notes: "Astral Projection; Spiritual master" },
+
+            { name: "Long Feng", element: "Earth", power: 7.0, notes: "Leader of Dai Li" },
+            { name: "Tonraq", element: "Water", power: 7.0, notes: "Korra's father; Physical brute force" },
+
+            { name: "Admiral Zhao", element: "Fire", power: 6.5, notes: "Lacks discipline; Easily baited" },
+            { name: "Desna & Eska", element: "Water", power: 6.5, notes: "Twin Synchronization" },
+
+            { name: "Xin Fu", element: "Earth", power: 6.0, notes: "Underground Arena; Physical bender" },
+            { name: "Kai", element: "Air", power: 6.0, notes: "Former thief; Stealth airbending" }, 
+
+            // --- COMMON (Power < 6.0) ---
+            { name: "The Boulder", element: "Earth", power: 5.5, notes: "Pro-Wrestling style" },
+            { name: "Kai", element: "Air", power: 5.5, notes: "Evasive style" }, 
+
+            { name: "Lightning Bolt Zolt", element: "Fire", power: 5.0, notes: "Triad leader; Weak lightning" },
+            { name: "Aiwei", element: "Earth", power: 5.0, notes: "Truth Seer; Low combat ability" },
+            { name: "Tho & Due", element: "Water", power: 5.0, notes: "Swamp benders" },
+            { name: "Opal", element: "Air", power: 5.0, notes: "Support; Lacks aggression" },
+
+            { name: "Meelo", element: "Air", power: 4.5, notes: "Creative; Fartbending" },
+            
+            { name: "Haru", element: "Earth", power: 4.0, notes: "Standard Earthbending" },
+            { name: "Bumi II", element: "Air", power: 4.0, notes: "Wild Card; Military tactics" }
+        ];
+
+        const AVATAR_EMOJIS = {
+            "Fire": ["🔥", "🐉", "⚡", "🎭", "🗡️", "🚀"],
+            "Water": ["🌊", "🌕", "❄️", "🛶", "🐟", "🐙"],
+            "Earth": ["⛰️", "🦡", "🧱", "🛡️", "👁️", "🧗"],
+            "Air": ["🌪️", "🪁", "🐃", "🧘", "🦅", "🍃"]
+        };
+
+        const BASE_CONFIG = {
+            TYPE_CHART: {
+                "Water": {"Fire": 1.5, "Water": 0.75, "Earth": 1.0, "Air": 1.0},
+                "Fire":  {"Air": 1.5, "Fire": 0.75, "Water": 0.5, "Earth": 1.0},
+                "Air":   {"Earth": 1.5, "Air": 0.75, "Fire": 1.0, "Water": 1.0},
+                "Earth": {"Water": 1.5, "Earth": 0.75, "Air": 0.5, "Fire": 1.0}
+            },
+            RARITY_MULT: { 
+                "Common": 1.0, 
+                "Rare": 1.25, 
+                "Epic": 1.6, 
+                "Legendary": 2.2, 
+                "Mythic": 3.0 
+            }
+        };
+        
+        // Helper function for determining rarity based on power level
+        function determineRarity(power) {
+            if (power >= 10.0) return "Mythic";
+            if (power >= 9.0) return "Legendary";
+            if (power >= 8.0) return "Epic";
+            if (power >= 6.0) return "Rare";
+            return "Common";
+        }
+
+        // ==========================================
+        // CLASSES
+        // ==========================================
+
+        class Unit {
+            constructor(id, team, config, forcedChar = null) {
+                this.id = id;
+                this.team = team; 
+                this.config = config;
+
+                // Pick Character (Randomly or Forced for Library view)
+                const charData = forcedChar || CHARACTER_DB[Math.floor(Math.random() * CHARACTER_DB.length)];
+                
+                this.name = charData.name;
+                this.element = charData.element;
+                this.subtype = charData.subtype || null;
+                this.power = charData.power; // Canonical power remains internal for rarity calc
+                this.notes = charData.notes;
+                this.avatar = this.getAvatarIcon();
+                
+                // Determine Rarity based on Power Level - using the global helper
+                this.rarity = determineRarity(this.power);
+                
+                // Determine Level (1-99) based on Rarity tier
+                this.level = this.calculateLevel(this.rarity);
+                
+                // Base Stats Generation
+                let hpBase = Math.floor(Math.random() * 50) + 100;
+                let atkBase = Math.floor(Math.random() * 20) + 20;
+                let spdBase = Math.floor(Math.random() * 15) + 10;
+
+                // Elemental Bias (Influences Class Assignment)
+                // --- INCREASED BIAS FOR CLEARER CLASS ASSIGNMENT ---
+                if (this.element === "Earth") { hpBase += 70; spdBase -= 10; } // Heavy Tank
+                if (this.element === "Air") { spdBase += 25; hpBase -= 30; } // Pure Evasion
+                if (this.element === "Fire") { atkBase += 25; } // High Damage
+                if (this.element === "Water") { hpBase += 30; atkBase += 10; } // Balanced Utility
+                // ----------------------------------------------------
+
+                const mult = this.config.RARITY_MULT[this.rarity];
+                
+                this.maxHp = Math.floor(hpBase * mult);
+                this.currentHp = this.maxHp;
+                this.atk = Math.floor(atkBase * mult);
+                this.spd = Math.floor(spdBase * mult);
+                
+                this.isDead = false;
+                this.atkMod = 1.0;
+                
+                // NEW: Assign Class
+                this.unitClass = this.assignClass();
+
+                // Calculate Potential Rating (P-Rating)
+                this.pRating = this.calculatePRating(this.maxHp, this.atk, this.spd, this.level, this.rarity);
+            }
+            
+            getAvatarIcon() {
+                // Special Icons for Mythics
+                const charData = CHARACTER_DB.find(c => c.name === this.name);
+                if (charData && charData.power >= 10.0) return "✨";
+                
+                const list = AVATAR_EMOJIS[this.element];
+                return list[Math.floor(Math.random() * list.length)];
+            }
+            
+            calculateLevel(rarity) {
+                let min, max;
+                switch (rarity) {
+                    case "Mythic": min = 90; max = 99; break;
+                    case "Legendary": min = 70; max = 89; break;
+                    case "Epic": min = 50; max = 69; break;
+                    case "Rare": min = 30; max = 49; break;
+                    case "Common":
+                    default: min = 10; max = 29; break;
+                }
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+            
+            // FIX: Robust Class Assignment Logic
+            assignClass() {
+                // Determine normalized values for comparison (to ignore rarity multiplier bias)
+                const normHP = this.maxHp / (this.config.RARITY_MULT[this.rarity] || 1);
+                const normATK = this.atk / (this.config.RARITY_MULT[this.rarity] || 1);
+                const normSPD = this.spd / (this.config.RARITY_MULT[this.rarity] || 1);
+
+                // Use the differences between stats to determine the primary role
+                const hpVsAtk = normHP - normATK;
+                const atkVsSpd = normATK - normSPD;
+                const spdVsHP = normSPD - normHP;
+
+                // Threshold to define specialization (e.g., a 25+ point difference in normalized stats)
+                const THRESHOLD = 25; 
+
+                // 1. Aggressor (High ATK, lower relative HP/SPD)
+                if (atkVsSpd > THRESHOLD && normATK > normHP) return "Aggressor";
+                
+                // 2. Defender (High HP, low relative ATK/SPD)
+                if (hpVsAtk > THRESHOLD && normHP > normSPD) return "Defender";
+                
+                // 3. Controller (High SPD, low relative ATK/HP)
+                if (spdVsHP > THRESHOLD && normSPD > normATK) return "Controller";
+                
+                // 4. Utility (Balanced or Water-based support/debuff)
+                if (this.element === 'Water' || (Math.abs(hpVsAtk) < THRESHOLD && Math.abs(atkVsSpd) < THRESHOLD)) {
+                    return "Utility"; 
+                }
+
+                // If specialized but didn't meet clear thresholds, assign based on primary stat
+                if (normATK > normHP && normATK > normSPD) return "Aggressor";
+                if (normHP > normATK && normHP > normSPD) return "Defender";
+                if (normSPD > normATK && normSPD > normHP) return "Controller";
+                
+                return "Utility"; // Default for all else
+            }
+
+
+            calculatePRating(hp, atk, spd, level, rarity) {
+                // P-Rating Calculation Logic: Weighted sum based on stats, level, and rarity tier
+                
+                const totalStats = hp + atk + spd;
+                // Stat Power Index (SPI): Max ~660 / 6 = ~110
+                const SPI = totalStats / 6; 
+                
+                // Rarity Scaling Factor (RSF): Higher multiplier for higher rarity
+                const rarityIndex = RARITIES.indexOf(rarity); // 0 (Common) to 4 (Mythic)
+                const RSF = 1 + (rarityIndex * 0.15); // Common: 1.0, Mythic: 1.6
+                
+                // Base Score (BS): Stat Power Index multiplied by Rarity Factor
+                let BS = SPI * RSF; 
+                
+                // Level Adjustment (LA): Add level contribution, normalized (Max ~30)
+                const LA = level * 0.3; 
+
+                let finalP = Math.floor(BS + LA);
+
+                // --- CLAMPING to enforce Tier Boundaries based on user's tiers ---
+                if (rarity === "Mythic") { 
+                    finalP = Math.min(100, Math.max(95, finalP)); // Tier S: 95-100
+                } else if (rarity === "Legendary") {
+                    finalP = Math.min(94, Math.max(80, finalP));  // Tier A: 80-94
+                } else if (rarity === "Epic") {
+                    finalP = Math.min(79, Math.max(65, finalP));  // Tier B: 65-79
+                } else if (rarity === "Rare") {
+                    finalP = Math.min(64, Math.max(40, finalP));  // Tier C (adjusted slightly higher for utility)
+                } else {
+                    finalP = Math.min(39, Math.max(15, finalP));  // Tier C (bottom end)
+                }
+                
+                return finalP;
+            }
+
+            takeDamage(amount) {
+                this.currentHp -= amount;
+                if (this.currentHp <= 0) {
+                    this.currentHp = 0;
+                    this.isDead = true;
+                }
+                return this.currentHp;
+            }
+        }
+
+        class GameSystem {
+            constructor() {
+                this.turn = 0;
+                this.playerTeam = [];
+                this.enemyTeam = [];
+                this.scores = { player: 0, enemy: 0 };
+                this.currentDuelIndex = 0; 
+                this.isAuto = false;
+                this.autoInterval = null;
+                this.gameOver = false;
+                this.config = JSON.parse(JSON.stringify(BASE_CONFIG));
+                this.libraryFilter = 'All'; 
+                this.librarySort = 'pRating'; // Default sort by P-Rating
+                this.sortDirection = 'desc'; 
+                this.libraryViewMode = 'list'; // 'list' or 'card'
+                this.initDevPanel();
+            }
+
+            initDevPanel() {
+                const typeChartContainer = document.getElementById('type-chart-inputs');
+                const rarityMultContainer = document.getElementById('rarity-mult-inputs');
+                
+                typeChartContainer.innerHTML = '';
+                ELEMENTS.forEach(att => {
+                    ELEMENTS.forEach(def => {
+                        const inputId = `mult-${att}-${def}`;
+                        const value = this.config.TYPE_CHART[att][def];
+                        const wrapper = document.createElement('div');
+                        wrapper.className = 'flex justify-between items-center border-b border-stone-800 pb-1';
+                        wrapper.innerHTML = `
+                            <label for="${inputId}" class="config-label text-xs text-stone-400 font-mono">${ICONS[att]} ➜ ${ICONS[def]}</label>
+                            <input type="number" id="${inputId}" value="${value}" step="0.1" min="0.0" class="w-16 text-right bg-stone-800 border border-stone-600 rounded p-1 text-xs text-white">
+                        `;
+                        typeChartContainer.appendChild(wrapper);
+                    });
+                });
+
+                rarityMultContainer.innerHTML = '';
+                RARITIES.forEach(rarity => {
+                    const inputId = `mult-${rarity}`;
+                    const value = this.config.RARITY_MULT[rarity];
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'flex justify-between items-center';
+                    const rarityColorClass = rarity === 'Mythic' ? 'text-fuchsia-400' : 'text-stone-400';
+                    wrapper.innerHTML = `
+                        <label for="${inputId}" class="config-label text-xs ${rarityColorClass} font-mono">${rarity}</label>
+                        <input type="number" id="${inputId}" value="${value}" step="0.1" min="1.0" class="w-16 text-right bg-stone-800 border border-stone-600 rounded p-1 text-xs text-white">
+                    `;
+                    rarityMultContainer.appendChild(wrapper);
+                });
+            }
+
+            saveConfig() {
+                ELEMENTS.forEach(att => {
+                    ELEMENTS.forEach(def => {
+                        const el = document.getElementById(`mult-${att}-${def}`);
+                        if (el) this.config.TYPE_CHART[att][def] = parseFloat(el.value);
+                    });
+                });
+                RARITIES.forEach(rarity => {
+                    const el = document.getElementById(`mult-${rarity}`);
+                    if (el) this.config.RARITY_MULT[rarity] = parseFloat(el.value);
+                });
+                this.toggleDevPanel();
+                this.startBattle();
+            }
+
+            toggleDevPanel() {
+                const panel = document.getElementById('dev-panel');
+                if(panel.style.transform === 'translateX(0px)') {
+                    panel.style.transform = 'translateX(-100%)';
+                } else {
+                    panel.style.transform = 'translateX(0px)';
+                }
+            }
+            
+            toggleLibrary() {
+                const panel = document.getElementById('library-panel');
+                panel.classList.toggle('active');
+                if(panel.classList.contains('active')) {
+                    this.renderLibrary();
+                }
+            }
+            
+            setViewMode(mode) {
+                this.libraryViewMode = mode;
+                this.renderLibrary();
+            }
+
+            // Set the filter and re-render
+            renderLibrary(filter = this.libraryFilter) {
+                this.libraryFilter = filter;
+                
+                const header = document.getElementById('library-list-header');
+                const content = document.getElementById('library-content');
+                
+                // Set Header and Content layout based on view mode
+                if (this.libraryViewMode === 'list') {
+                    header.style.display = 'grid';
+                    content.className = 'space-y-3';
+                    this.renderLibraryList(content);
+                } else {
+                    header.style.display = 'none';
+                    content.className = 'grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 pt-4';
+                    this.renderLibraryCards(content);
+                }
+            }
+
+            // Set the sort parameter and re-render
+            sortLibrary(sortBy) {
+                if (this.librarySort === sortBy) {
+                    // If clicking the same sort button, flip the direction
+                    this.sortDirection = this.sortDirection === 'desc' ? 'asc' : 'desc';
+                } else {
+                    // If clicking a new sort button, set new sort and reset to descending
+                    this.librarySort = sortBy;
+                    this.sortDirection = 'desc'; 
+                }
+                this.renderLibrary(); // Re-render with new sort criteria
+            }
+            
+            // --- Rendering Logic for List View ---
+            renderLibraryList(container) {
+                container.innerHTML = '';
+                
+                // 1. Filter the database
+                const filteredDB = CHARACTER_DB.filter(charData => {
+                    if (this.libraryFilter === 'All') return true;
+                    
+                    // Check if filter matches Element OR Subtype
+                    return charData.element === this.libraryFilter || charData.subtype === this.libraryFilter;
+                });
+                
+                // 2. Create Unit objects for stats calculation
+                const unitList = filteredDB.map(charData => {
+                    // Always generate a new Unit to ensure up-to-date stat calculation
+                    return new Unit(`lib-${charData.name}`, 'player', this.config, charData);
+                });
+
+                // 3. Sort the list
+                const directionMultiplier = this.sortDirection === 'desc' ? -1 : 1;
+                unitList.sort((a, b) => {
+                    let valA, valB;
+                    const getRarityIndex = (rarity) => RARITIES.indexOf(rarity);
+                    
+                    switch (this.librarySort) {
+                        case 'maxHp': valA = a.maxHp; valB = b.maxHp; break;
+                        case 'atk': valA = a.atk; valB = b.atk; break;
+                        case 'spd': valA = a.spd; valB = b.spd; break;
+                        case 'rarity': valA = getRarityIndex(a.rarity); valB = getRarityIndex(b.rarity); break;
+                        case 'pRating': valA = a.pRating; valB = b.pRating; break;
+                        default: valA = a.level; valB = b.level; break;
+                    }
+                    
+                    let comparison = 0;
+                    if (valA > valB) {
+                        comparison = 1;
+                    } else if (valA < valB) {
+                        comparison = -1;
+                    }
+                    
+                    return comparison * directionMultiplier; 
+                });
+
+                // 4. Render the list view
+                if (unitList.length === 0) {
+                    container.innerHTML = `<p class="text-center text-stone-500 italic mt-8">No cards matching the filter "${this.libraryFilter}".</p>`;
+                    return;
+                }
+
+                unitList.forEach(unit => {
+                    const listItem = document.createElement('div');
+                    
+                    const colorClasses = {
+                        "Common": "text-stone-300", "Rare": "text-blue-400", "Epic": "text-purple-400",
+                        "Legendary": "text-yellow-400", "Mythic": "text-fuchsia-400 font-bold",
+                    };
+                    
+                    listItem.className = `
+                        bg-stone-800/80 hover:bg-stone-700/80 p-4 rounded-lg shadow-md transition
+                        grid grid-cols-7 items-center text-sm font-mono text-stone-300
+                    `;
+                    
+                    const rarityColor = colorClasses[unit.rarity];
+                    
+                    const classIcon = ICONS[unit.unitClass] || '';
+                    const classColor = unit.unitClass === 'Aggressor' ? 'text-red-400' : 
+                                       unit.unitClass === 'Defender' ? 'text-green-400' : 
+                                       unit.unitClass === 'Controller' ? 'text-cyan-400' : 'text-yellow-400';
+
+                    const subtitle = unit.subtype ? 
+                        `<div class="text-[10px] uppercase text-stone-400">${unit.element} / ${unit.subtype}</div>` :
+                        `<div class="text-[10px] uppercase text-stone-400">${unit.element}</div>`;
+                    
+                    listItem.innerHTML = `
+                        <div class="col-span-2 flex items-center gap-3">
+                            <span class="text-xl">${unit.avatar}</span>
+                            <div>
+                                <div class="font-display text-base leading-none text-white">${unit.name}</div>
+                                ${subtitle}
+                            </div>
+                        </div>
+                        <span class="text-center font-bold ${classColor} flex items-center justify-center gap-1">
+                            ${classIcon} ${unit.unitClass.substring(0, 4)}
+                        </span>
+                        <span class="text-center font-bold text-yellow-300">${unit.pRating}</span>
+                        <span class="text-center ${rarityColor} text-xs uppercase hidden md:inline">${unit.rarity.substring(0, 3)}</span>
+                        <span class="text-center text-green-400">${unit.maxHp}</span>
+                        <span class="text-center">
+                            <span class="text-red-400">${unit.atk}</span> / 
+                            <span class="text-cyan-400">${unit.spd}</span>
+                        </span>
+                    `;
+                    container.appendChild(listItem);
+                });
+            }
+
+            // --- Rendering Logic for Card View ---
+            renderLibraryCards(container) {
+                container.innerHTML = '';
+                
+                // 1. Filter the database (same logic as list view)
+                const filteredDB = CHARACTER_DB.filter(charData => {
+                    if (this.libraryFilter === 'All') return true;
+                    return charData.element === this.libraryFilter || charData.subtype === this.libraryFilter;
+                });
+                
+                // 2. Create Unit objects for stats calculation
+                const unitList = filteredDB.map(charData => {
+                    return new Unit(`lib-${charData.name}`, 'player', this.config, charData);
+                });
+                
+                // 3. Sort the list (same logic as list view)
+                const directionMultiplier = this.sortDirection === 'desc' ? -1 : 1;
+                unitList.sort((a, b) => {
+                    let valA, valB;
+                    const getRarityIndex = (rarity) => RARITIES.indexOf(rarity);
+                    
+                    switch (this.librarySort) {
+                        case 'maxHp': valA = a.maxHp; valB = b.maxHp; break;
+                        case 'atk': valA = a.atk; valB = b.atk; break;
+                        case 'spd': valA = a.spd; valB = b.spd; break;
+                        case 'rarity': valA = getRarityIndex(a.rarity); valB = getRarityIndex(b.rarity); break;
+                        case 'pRating': valA = a.pRating; valB = b.pRating; break;
+                        default: valA = a.level; valB = b.level; break;
+                    }
+                    
+                    let comparison = 0;
+                    if (valA > valB) {
+                        comparison = 1;
+                    } else if (valA < valB) {
+                        comparison = -1;
+                    }
+                    
+                    return comparison * directionMultiplier; 
+                });
+                
+                // 4. Render the card view
+                if (unitList.length === 0) {
+                    container.innerHTML = `<p class="text-center text-stone-500 italic mt-8 col-span-full">No cards matching the filter "${this.libraryFilter}".</p>`;
+                    return;
+                }
+
+                unitList.forEach(unit => {
+                    const card = document.createElement('div');
+                    
+                    // Rarity Border Class
+                    card.classList.add('lib-card', `lib-${unit.rarity.toLowerCase()}`);
+                    // Elemental Background Class
+                    card.classList.add(`lib-bg-${unit.element}`);
+
+                    // Inner Content
+                    const classIcon = ICONS[unit.unitClass] || '';
+                    const classColor = unit.unitClass === 'Aggressor' ? 'text-red-400' : 
+                                       unit.unitClass === 'Defender' ? 'text-green-400' : 
+                                       unit.unitClass === 'Controller' ? 'text-cyan-400' : 'text-yellow-400';
+
+                    const subtypeDisplay = unit.subtype ? 
+                        `<div class="text-[10px] uppercase text-stone-300 leading-none">${unit.element} / ${unit.subtype}</div>` : 
+                        `<div class="text-[10px] uppercase text-stone-300 leading-none">${unit.element}</div>`;
+                    
+                    const statDisplay = `
+                        <div class="flex flex-col text-xs font-mono text-stone-200">
+                            <span class="text-green-300">${ICONS.HP} ${unit.maxHp}</span>
+                            <span class="text-red-300">${ICONS.ATK} ${unit.atk}</span>
+                            <span class="text-cyan-300">${ICONS.SPD} ${unit.spd}</span>
+                        </div>
+                    `;
+
+                    // P-Rating Display
+                    const pRatingDisplay = `<div class="text-4xl font-display text-yellow-300 font-bold">${unit.pRating}</div>`;
+
+                    card.innerHTML = `
+                        <!-- Card Header (Name, Level, and Rarity) -->
+                        <div class="h-8 flex items-center justify-between px-3 bg-black/40 border-b border-stone-700">
+                            <h4 class="font-display text-sm text-white">${unit.name}</h4>
+                            <div class="flex items-center gap-2">
+                                <span class="text-yellow-300 text-xs font-mono">LVL ${unit.level}</span>
+                                <span class="text-orange-400 text-xs uppercase font-bold">${unit.rarity}</span>
+                            </div>
+                        </div>
+
+                        <!-- Card Body (Graphic and Stats) -->
+                        <div class="p-4 flex flex-col items-center gap-3">
+                            <!-- Center Graphic (Placeholder) -->
+                            <div class="lib-center-graphic">
+                                <span class="text-5xl">${unit.avatar}</span>
+                            </div>
+
+                            <!-- P-Rating, Class & Subtype -->
+                            <div class="text-center">
+                                ${pRatingDisplay}
+                                <div class="text-lg font-bold ${classColor} flex items-center justify-center gap-1 leading-none">
+                                    ${classIcon} ${unit.unitClass}
+                                </div>
+                                ${subtypeDisplay}
+                            </div>
+                            
+                            <!-- Stats Block -->
+                            <div class="w-full bg-black/20 p-2 rounded-lg border border-stone-700 flex justify-around items-center">
+                                ${statDisplay}
+                            </div>
+
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            }
+
+
+            updateTurnCounter() {
+                document.getElementById('turn-counter').innerText = `Turn: ${this.turn}`;
+            }
+            
+            startBattle() {
+                this.turn = 0;
+                this.gameOver = false;
+                this.scores = { player: 0, enemy: 0 };
+                this.currentDuelIndex = 0;
+
+                if (this.isAuto) this.toggleAuto(); 
+                
+                document.getElementById('winner-overlay').classList.add('hidden');
+                document.getElementById('next-btn').disabled = false;
+                this.updateScoreboard();
+
+                // Generate Teams
+                this.playerTeam = Array.from({length: 3}, (_, i) => new Unit(`p-${i}`, 'player', this.config));
+                this.enemyTeam = Array.from({length: 3}, (_, i) => new Unit(`e-${i}`, 'enemy', this.config));
+
+                // Apply Synergies
+                this.applySynergy(this.playerTeam);
+                this.applySynergy(this.enemyTeam);
+
+                // Render
+                this.renderTeam('player-container', this.playerTeam);
+                this.renderTeam('enemy-container', this.enemyTeam);
+                this.updateSynergyUI();
+                this.updateActiveDuelVisuals();
+                
+                const log = document.getElementById('battle-log');
+                if(log) log.innerHTML = `<div class="text-orange-400 font-display text-center border-b border-stone-700 pb-2 mb-2 tracking-widest">AGNI KAI BEGINS</div>`;
+                this.updateTurnCounter();
+            }
+
+            applySynergy(team) {
+                const counts = {};
+                team.forEach(u => counts[u.element] = (counts[u.element] || 0) + 1);
+                for (let elem in counts) {
+                    if (counts[elem] >= 2) {
+                        const bonus = 0.15;
+                        team.forEach(u => {
+                            if (u.element === elem) {
+                                u.atkMod += bonus;
+                                u.maxHp = Math.floor(u.maxHp * (1 + bonus)); 
+                                u.currentHp = u.maxHp;
+                            }
+                        });
+                    }
+                }
+            }
+
+            toggleAuto() {
+                if (this.gameOver) return;
+                this.isAuto = !this.isAuto;
+                const btn = document.getElementById('auto-btn');
+                const nextBtn = document.getElementById('next-btn');
+
+                if (this.isAuto) {
+                    btn.classList.remove('bg-stone-700');
+                    btn.classList.add('bg-green-600');
+                    nextBtn.disabled = true;
+                    this.autoInterval = setInterval(() => this.nextTurn(), 1000); 
+                } else {
+                    btn.classList.add('bg-stone-700');
+                    btn.classList.remove('bg-green-600');
+                    nextBtn.disabled = false;
+                    clearInterval(this.autoInterval);
+                }
+            }
+
+            nextTurn() {
+                if (this.gameOver) return;
+                if(this.currentDuelIndex >= 3) return; 
+                
+                const playerUnit = this.playerTeam[this.currentDuelIndex];
+                const enemyUnit = this.enemyTeam[this.currentDuelIndex];
+
+                if (playerUnit.isDead || enemyUnit.isDead) {
+                    this.resolveDuel(playerUnit, enemyUnit);
+                    return;
+                }
+
+                this.turn++;
+                this.updateTurnCounter();
+
+                let attackers = [playerUnit, enemyUnit];
+                if (playerUnit.spd === enemyUnit.spd) {
+                     attackers.sort(() => Math.random() - 0.5);
+                } else {
+                     attackers.sort((a, b) => b.spd - a.spd);
+                }
+
+                const first = attackers[0];
+                const second = attackers[1];
+
+                this.executeAttack(first, second);
+                
+                if (!second.isDead) {
+                    setTimeout(() => {
+                        if(!this.gameOver && !first.isDead) { 
+                            this.executeAttack(second, first);
+                        }
+                    }, 500); 
+                }
+            }
+            
+            resolveDuel(pUnit, eUnit) {
+                let winnerName = "";
+                
+                if (pUnit.isDead && !eUnit.isDead) {
+                    this.scores.enemy++;
+                    winnerName = eUnit.name;
+                } else if (eUnit.isDead && !pUnit.isDead) {
+                    this.scores.player++;
+                    winnerName = pUnit.name;
+                } else {
+                    winnerName = "Draw";
+                }
+
+                this.updateScoreboard();
+                this.logAction(null, null, 0, 0, false, `Duel ${this.currentDuelIndex + 1} End: ${winnerName} Wins!`);
+
+                this.currentDuelIndex++;
+                
+                if (this.scores.player >= 2 || this.scores.enemy >= 2 || this.currentDuelIndex >= 3) {
+                    this.endGame();
+                } else {
+                    this.updateActiveDuelVisuals();
+                }
+            }
+
+            executeAttack(attacker, target) {
+                if(attacker.isDead || target.isDead) return;
+
+                const multiplier = this.config.TYPE_CHART[attacker.element][target.element];
+                const critChance = 0.10 + (attacker.spd / 200);
+                const isCrit = Math.random() < critChance;
+                const critMult = isCrit ? 1.5 : 1.0;
+                
+                const rawDamage = attacker.atk * attacker.atkMod;
+                const finalDamage = Math.floor(rawDamage * multiplier * critMult);
+
+                target.takeDamage(finalDamage);
+
+                this.animateAttack(attacker.id, target.id, finalDamage, isCrit, multiplier);
+                this.updateCardUI(target);
+                this.logAction(attacker, target, finalDamage, multiplier, isCrit);
+            }
+
+            logAction(attacker, target, damage, mult, isCrit, customMessage = null) {
+                const log = document.getElementById('battle-log');
+                if(!log) return;
+                
+                const entry = document.createElement('div');
+                
+                if (customMessage) {
+                    entry.className = `text-yellow-400 font-bold border-l-2 pl-2 mb-2 border-yellow-600 bg-stone-800/50 p-1 rounded`;
+                    entry.innerHTML = customMessage;
+                } else {
+                    let effectText = "";
+                    let colorClass = "text-stone-300";
+
+                    if (mult > 1.0) { effectText = "⚡"; colorClass = "text-yellow-200"; }
+                    else if (mult < 1.0) { effectText = "🛡️"; colorClass = "text-stone-500"; }
+
+                    const critText = isCrit ? `<span class="text-orange-500 font-bold">CRIT!</span>` : "";
+                    const killText = target.isDead ? `💀` : "";
+
+                    entry.className = `border-l-2 pl-2 mb-1 ${attacker.team === 'player' ? 'border-green-600' : 'border-red-600'}`;
+                    entry.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <span>
+                                ${ICONS[attacker.element]} <b>${attacker.name}</b> 
+                                <span class="text-stone-500">➜</span> 
+                                <b>${target.name}</b>
+                            </span>
+                            <span class="${colorClass} font-mono font-bold">-${damage} ${effectText}</span>
+                        </div>
+                        <div class="text-xs flex justify-end gap-2">
+                            ${critText} ${killText}
+                        </div>
+                    `;
+                }
+                
+                log.appendChild(entry);
+                log.scrollTop = log.scrollHeight;
+            }
+
+            animateAttack(attId, defId, damage, isCrit, mult) {
+                const attCard = document.getElementById(attId);
+                const defCard = document.getElementById(defId);
+                if(!attCard || !defCard) return;
+
+                attCard.classList.add('attacking');
+                setTimeout(() => attCard.classList.remove('attacking'), 300);
+
+                setTimeout(() => {
+                    defCard.classList.add('hit');
+                    const dmgNum = document.createElement('div');
+                    dmgNum.className = 'damage-number';
+                    if(isCrit) dmgNum.classList.add('crit-text');
+                    dmgNum.innerText = damage;
+                    if(mult > 1) dmgNum.innerText += " ⚡";
+                    if(mult < 1) dmgNum.innerText += " 🛡️";
+                    defCard.appendChild(dmgNum);
+                    setTimeout(() => {
+                        defCard.classList.remove('hit');
+                        if(defCard.contains(dmgNum)) defCard.removeChild(dmgNum);
+                    }, 1000);
+                }, 150);
+            }
+
+            updateCardUI(unit) {
+                const card = document.getElementById(unit.id);
+                if (!card) return;
+
+                const hpBar = card.querySelector('.hp-fill');
+                const hpText = card.querySelector('.hp-text');
+                
+                const pct = (unit.currentHp / unit.maxHp) * 100;
+                hpBar.style.width = `${pct}%`;
+                hpText.innerText = `${unit.currentHp}/${unit.maxHp}`;
+                
+                if (pct < 30) hpBar.classList.replace('bg-green-500', 'bg-red-500');
+                else hpBar.classList.replace('bg-red-500', 'bg-green-500');
+
+                if (unit.isDead) card.classList.add('dead');
+            }
+            
+            updateActiveDuelVisuals() {
+                document.querySelectorAll('.card').forEach(c => {
+                    c.classList.add('inactive');
+                    c.classList.remove('active-duelist');
+                });
+                
+                if(this.currentDuelIndex < 3) {
+                    const pUnit = this.playerTeam[this.currentDuelIndex];
+                    const eUnit = this.enemyTeam[this.currentDuelIndex];
+
+                    const pCard = document.getElementById(pUnit.id);
+                    const eCard = document.getElementById(eUnit.id);
+                    
+                    if(pCard) { pCard.classList.remove('inactive'); pCard.classList.add('active-duelist'); }
+                    if(eCard) { eCard.classList.remove('inactive'); eCard.classList.add('active-duelist'); }
+                }
+            }
+
+            updateScoreboard() {
+                document.getElementById('score-player').innerText = this.scores.player;
+                document.getElementById('score-enemy').innerText = this.scores.enemy;
+            }
+
+            endGame() {
+                this.gameOver = true;
+                this.isAuto = false;
+                clearInterval(this.autoInterval);
+                document.getElementById('next-btn').disabled = true;
+
+                const winnerText = document.getElementById('winner-text');
+                const winnerSub = document.getElementById('winner-subtext');
+                const overlay = document.getElementById('winner-overlay');
+                
+                if (this.scores.player > this.scores.enemy) {
+                    winnerText.innerText = "VICTORY";
+                    winnerText.className = "text-7xl font-display mb-2 text-green-400 drop-shadow-[0_5px_5px_rgba(0,0,0,0.8)] tracking-widest";
+                    winnerSub.innerText = "Team Avatar Prevails";
+                } else if (this.scores.enemy > this.scores.player) {
+                    winnerText.innerText = "DEFEAT";
+                    winnerText.className = "text-7xl font-display mb-2 text-red-500 drop-shadow-[0_5px_5px_rgba(0,0,0,0.8)] tracking-widest";
+                    winnerSub.innerText = "The Red Lotus Rises";
+                } else {
+                    winnerText.innerText = "DRAW";
+                    winnerText.className = "text-7xl font-display mb-2 text-stone-300 drop-shadow-[0_5px_5px_rgba(0,0,0,0.8)] tracking-widest";
+                    winnerSub.innerText = "Perfectly Balanced";
+                }
+                
+                setTimeout(() => overlay.classList.remove('hidden'), 1000);
+            }
+
+            renderTeam(containerId, team) {
+                const container = document.getElementById(containerId);
+                container.innerHTML = '';
+
+                team.forEach(unit => {
+                    const el = document.createElement('div');
+                    el.id = unit.id;
+                    el.className = `card w-36 h-52 bg-stone-800 border flex flex-col shadow-lg select-none cursor-pointer hover:brightness-110`;
+                    
+                    el.classList.add(`${unit.element.toLowerCase()}-theme`);
+                    el.classList.add(`rarity-${unit.rarity.toLowerCase()}`);
+
+                    // Determine what to display below the name
+                    const classIcon = ICONS[unit.unitClass] || '';
+                    const classColor = unit.unitClass === 'Aggressor' ? 'text-red-400' : 
+                                       unit.unitClass === 'Defender' ? 'text-green-400' : 
+                                       unit.unitClass === 'Controller' ? 'text-cyan-400' : 'text-yellow-400';
+                    
+                    const classDisplay = `<div class="text-[10px] uppercase font-bold ${classColor} flex items-center justify-center gap-1">${classIcon} ${unit.unitClass}</div>`;
+                    
+                    el.innerHTML = `
+                        <!-- Card Header: Name and Rarity -->
+                        <div class="h-8 flex items-center justify-between px-2 bg-black/50 border-b border-stone-700">
+                            <span class="text-white font-display text-sm">${unit.name}</span>
+                            <span class="text-orange-400 text-xs uppercase font-bold">${unit.rarity}</span>
+                        </div>
+                        <!-- Secondary Bar: Element and Level -->
+                        <div class="h-6 flex items-center justify-between px-2 bg-black/30 text-[10px] font-bold tracking-wider text-stone-300">
+                            <span>${ICONS[unit.element]}</span>
+                            <span class="text-yellow-300 font-mono">LVL ${unit.level}</span>
+                        </div>
+
+                        <div class="flex-1 flex flex-col items-center justify-center p-2 text-center relative overflow-hidden">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+                            <div class="text-5xl mb-1 filter drop-shadow-md z-10 transform transition hover:scale-110 duration-500">
+                                ${unit.avatar}
+                            </div>
+                            <!-- NEW: Class Display -->
+                            ${classDisplay}
+                        </div>
+                        <div class="bg-black/50 p-2 text-xs space-y-1 backdrop-blur-sm">
+                            <div class="flex justify-between text-stone-300 font-mono text-[10px]">
+                                <span>${ICONS.ATK} ${unit.atk}</span>
+                                <span>${ICONS.SPD} ${unit.spd}</span>
+                            </div>
+                            <div class="relative w-full h-2 bg-stone-900 rounded-full overflow-hidden border border-stone-600">
+                                <div class="hp-fill absolute left-0 top-0 h-full bg-green-600 transition-all duration-300" style="width: 100%"></div>
+                            </div>
+                            <div class="hp-text text-center text-[9px] font-bold text-stone-400">
+                                ${unit.currentHp}/${unit.maxHp}
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(el);
+                });
+            }
+
+            updateSynergyUI() {
+                const list = document.getElementById('synergy-list');
+                if(!list) return;
+                list.innerHTML = '';
+                [this.playerTeam, this.enemyTeam].forEach((team, idx) => {
+                    const counts = {};
+                    team.forEach(u => counts[u.element] = (counts[u.element] || 0) + 1);
+                    let activeSyns = [];
+                    for(let el in counts) {
+                        if (counts[el] >= 2) {
+                            const bonusText = (team.find(u => u.element === el).atkMod - 1) * 100;
+                            activeSyns.push(`${ICONS[el]} ${el} +${bonusText.toFixed(0)}%`);
+                        }
+                    }
+                    if(activeSyns.length > 0) {
+                        const div = document.createElement('div');
+                        div.className = idx === 0 ? "text-green-400" : "text-red-400";
+                        div.innerText = `${idx === 0 ? "Player" : "Enemy"}: ${activeSyns.join(", ")}`;
+                        list.appendChild(div);
+                    }
+                });
+                if(list.innerHTML === '') list.innerHTML = '<span class="text-stone-600 italic">No elemental harmony</span>';
+            }
+        }
+
+        const game = new GameSystem();
+        window.onload = () => game.startBattle();
+
+    </script>
+</body>
+</html>

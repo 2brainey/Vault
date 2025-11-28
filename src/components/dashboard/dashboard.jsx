@@ -573,7 +573,8 @@ export default function VaultDashboard() {
               { id: 'inventory', icon: "Package", label: 'INVENTORY' },
               { id: 'stats', icon: "Activity", label: 'STATS' }, 
               { id: 'estate', icon: "Home", label: 'ESTATE' }, 
-              { id: 'inputs', icon: "Code", label: 'INPUTS' } 
+              { id: 'inputs', icon: "Code", label: 'INPUTS' }, 
+              { id: 'logisticsdashboard', icon: "Code", label: 'LOGISTICS' }
             ].map((tab) => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-2" style={{ backgroundColor: activeTab === tab.id ? colors.accentPrimary : 'transparent', color: activeTab === tab.id ? '#000' : '#94a3b8' }}>
                 <RenderIcon name={tab.icon} size={16} /> <span className="hidden md:inline">{tab.label}</span>

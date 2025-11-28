@@ -41,7 +41,7 @@ export default function StatisticsTab({ stats }) {
                 />
                 <StatCard 
                     label="Hydration Logged" 
-                    value={s.maintenance?.hydration || 0} 
+                    value={s.maintenance?.hydration || 0}
                     icon="Droplet" 
                     color="text-blue-400" 
                     subtext="Water intake sessions"
