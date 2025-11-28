@@ -25,6 +25,7 @@ import EstatePrototype from './estateprototype';
 
 export default function VaultDashboard() {
   
+  
   // --- STATE CONNECTION: IMPORTING DATA AND ACTIONS ---
   const { 
     data, 
@@ -41,7 +42,8 @@ export default function VaultDashboard() {
     handleSellCardAction, 
     toggleAchievementAction, 
     handleClaimMasteryRewardAction, 
-    pendingPackOpen 
+    pendingPackOpen,
+    getSkillData,
   } = useGameStore();
 
   // --- LIFECYCLE HOOKS ---
@@ -267,55 +269,15 @@ export default function VaultDashboard() {
     }
   };
 
+// --- MEMOIZED CALCULATIONS (Read-Only) ---
 
   const playerSkillsMemo = useMemo(() => {
-    const calcLevel = (xp) => Math.max(1, Math.min(Math.floor(25 * Math.log10((xp / 100) + 1)), 99));
-    const getXP = (base, id) => (Number(base) || 0) + (data.bonusXP?.[id] || 0);
-    
-    const incXP = getXP(data.lifetime.totalIncomeBase * 10, 'inc'); 
-    const codXP = getXP(35000 + ((data.assets?.digitalIP || 0) * 5), 'cod');
-    const cntXP = getXP(15000 + ((data.assets?.audience || 0) * 50), 'cnt');
-    
-    const secXP = getXP((data.cash || 0) + (data.lifetime.totalDebtPrincipalPaid * 10), 'sec');
-    
-    const astXP = getXP(data.lifetime.totalAssetAcquisitionCost * 5, 'ast');
-
-    const currentCashFlowValue = (data.monthlyIncome || 0) - (data.monthlyExpenses || 0);
-    const updatedPeakFlow = Math.max(data.lifetime.peakCashFlow, currentCashFlowValue * 20); 
-    const floXP = getXP(updatedPeakFlow, 'flo');
-    
-    const vitXP = getXP(85000, 'vit');
-    const wisXP = getXP(30000 + (data.achievements.filter(a => a.completed).length * 5000), 'wis');
-    const netXP = getXP(15000 + ((data.assets?.audience || 0) * 100), 'net');
-    const invXP = getXP(Math.max((data.assets?.stocks || 0) + (data.assets?.crypto || 0), 0), 'inv');
-    const estXP = getXP((data.assets?.realEstate || 0), 'est');
-    const disXP = getXP(0, 'dis');
-    const aiXP = getXP(40000, 'ai');
-
-    if (updatedPeakFlow > data.lifetime.peakCashFlow) {
-        updateData(prev => ({ 
-            lifetime: { ...prev.lifetime, peakCashFlow: updatedPeakFlow } 
-        }));
-    }
-
-    const skillXpMap = {
-        inc: incXP, cod: codXP, cnt: cntXP, ai: aiXP, sec: secXP, vit: vitXP, 
-        wis: wisXP, net: netXP, ast: astXP, flo: floXP, inv: invXP, est: estXP, dis: disXP
-    };
-
-    const totalXPs = skillXpMap;
-    
-    const calculatedSkills = Object.keys(SKILL_DETAILS).map(key => {
-        let xp = skillXpMap[key] || 0;
-        return { ...SKILL_DETAILS[key], id: key, level: calcLevel(xp), iconName: SKILL_DETAILS[key].icon || 'Circle', color: SKILL_DETAILS[key].color };
-    });
-
-    return { calculatedSkills, totalXPs };
-
-  }, [data.monthlyIncome, data.assets, data.cash, data.monthlyExpenses, data.bonusXP, data.achievements, data.lifetime]);
+    // This calls the new function in the store
+    return getSkillData(); 
+    // The dependency array now only needs the core data object, as the store handles the sub-dependencies
+  }, [data, getSkillData]);
   
-  const { calculatedSkills: playerSkills, totalXPs } = playerSkillsMemo; 
-
+  const { calculatedSkills: playerSkills, totalXPs } = playerSkillsMemo;
   const combatStats = useMemo(() => {
     const totalLevel = playerSkills.reduce((sum, s) => sum + s.level, 0);
     const combatLevel = Math.floor(totalLevel / 4);

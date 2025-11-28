@@ -5,7 +5,8 @@ import {
     initialData, 
     INVENTORY_SLOTS, 
     SHOP_ITEMS, 
-    CARD_DATABASE 
+    CARD_DATABASE,
+    SKILL_DETAILS
 } from '../data/gamedata';
 
 // --- HELPER FUNCTIONS (Moved from dashboard.jsx to the store file) ---
@@ -74,6 +75,15 @@ const mergeData = (base, saved) => {
   
   return merged;
 };
+
+// src/store/gamestore.js (after mergeData, before ZUSTAND STORE DEFINITION)
+
+// ... existing helper functions like mergeData
+
+// --- NEW XP CALCULATION HELPERS ---
+const calcLevel = (xp) => Math.max(1, Math.min(Math.floor(25 * Math.log10((xp / 100) + 1)), 99));
+const getXP = (base, id, data) => (Number(base) || 0) + (data.bonusXP?.[id] || 0);
+
 
 // --- ZUSTAND STORE DEFINITION ---
 
@@ -333,6 +343,70 @@ export const useGameStore = create((set, get) => ({
     });
 
     return { success: true, message: `Sold card for ${value} DSC` };
-  }
+  },
+
+// src/store/gamestore.js (INSIDE the return object of create)
+
+// ... existing actions like handleSellCardAction
+
+  // --- XP ENGINE LOGIC (New Action: Cut from dashboard.jsx) ---
+  getSkillData: () => {
+    const state = get();
+    const data = state.data;
+    
+    // Core XP Calculation Logic 
+    // NOTE: We now pass 'data' to the getXP helper
+    const incXP = getXP(data.lifetime.totalIncomeBase * 10, 'inc', data); 
+    const codXP = getXP(35000 + ((data.assets?.digitalIP || 0) * 5), 'cod', data);
+    const cntXP = getXP(15000 + ((data.assets?.audience || 0) * 50), 'cnt', data);
+    
+    const secXP = getXP((data.cash || 0) + (data.lifetime.totalDebtPrincipalPaid * 10), 'sec', data);
+    
+    const astXP = getXP(data.lifetime.totalAssetAcquisitionCost * 5, 'ast', data);
+
+    const currentCashFlowValue = (data.monthlyIncome || 0) - (data.monthlyExpenses || 0);
+    const updatedPeakFlow = Math.max(data.lifetime.peakCashFlow, currentCashFlowValue * 20); 
+    const floXP = getXP(updatedPeakFlow, 'flo', data);
+    
+    const vitXP = getXP(85000, 'vit', data);
+    const wisXP = getXP(30000 + (data.achievements.filter(a => a.completed).length * 5000), 'wis', data);
+    const netXP = getXP(15000 + ((data.assets?.audience || 0) * 100), 'net', data);
+    const invXP = getXP(Math.max((data.assets?.stocks || 0) + (data.assets?.crypto || 0), 0), 'inv', data);
+    const estXP = getXP((data.assets?.realEstate || 0), 'est', data);
+    const disXP = getXP(0, 'dis', data);
+    const aiXP = getXP(40000, 'ai', data);
+
+    // Self-Correction Logic (Updating the store if peak flow is higher)
+    if (updatedPeakFlow > data.lifetime.peakCashFlow) {
+        set(prevState => ({ 
+            data: { 
+                ...prevState.data, 
+                lifetime: { ...prevState.data.lifetime, peakCashFlow: updatedPeakFlow } 
+            }
+        }));
+    }
+
+    const skillXpMap = {
+        inc: incXP, cod: codXP, cnt: cntXP, ai: aiXP, sec: secXP, vit: vitXP, 
+        wis: wisXP, net: netXP, ast: astXP, flo: floXP, inv: invXP, est: estXP, dis: disXP
+    };
+
+    const totalXPs = skillXpMap;
+    
+    // Map data to the final format needed by the UI
+    const calculatedSkills = Object.keys(SKILL_DETAILS).map(key => {
+        let xp = skillXpMap[key] || 0;
+        return { 
+            ...SKILL_DETAILS[key], 
+            id: key, 
+            level: calcLevel(xp), 
+            iconName: SKILL_DETAILS[key].icon || 'Circle', 
+            color: SKILL_DETAILS[key].color 
+        };
+    });
+
+    // Return the required structure to the consuming component (dashboard.jsx)
+    return { calculatedSkills, totalXPs };
+  },
 
 }));

@@ -1,9 +1,10 @@
+// src/config/firebase.js (after modifications)
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
-// PASTE YOUR CONFIG OBJECT HERE
+// Access key via Vite's global environment object
 const firebaseConfig = {
-  apiKey: "AIzaSyCEAPEfT9qiSpE-aeDXNw98VIslKUMmOiE",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: "vault-b78d7.firebaseapp.com",
   projectId: "vault-b78d7",
   storageBucket: "vault-b78d7.firebasestorage.app",
