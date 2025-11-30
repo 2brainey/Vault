@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { db } from '../config/firebase'; 
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { 
-    initialData as staticInitialData, 
+    initialData, 
     INVENTORY_SLOTS, 
     SHOP_ITEMS, 
     CARD_DATABASE,
@@ -27,18 +27,14 @@ const addToSlotArray = (slots, item, quantity = 1) => {
     return null;
 };
 
-// Augmented initial data to include Salvage
-const extendedInitialData = {
-    ...staticInitialData,
-    salvage: 0, // NEW RESOURCE
-};
-
 // Helper to safely merge saved data
 const mergeData = (base, saved) => {
   const merged = { 
       ...base, 
       ...saved,
-      salvage: saved?.salvage !== undefined ? saved.salvage : (base.salvage || 0), // Ensure salvage exists
+      salvage: saved?.salvage !== undefined ? saved.salvage : (base.salvage || 0),
+      lastDailyClaim: saved?.lastDailyClaim || 0, // Merge new persistence fields
+      lastHourlyClaim: saved?.lastHourlyClaim || 0,
       statistics: { ...base.statistics, ...(saved?.statistics || {}) },
       bonusXP: { ...base.bonusXP, ...(saved?.bonusXP || {}) },
       wellness: { ...base.wellness, ...(saved?.wellness || {}) },
@@ -74,7 +70,7 @@ const getXP = (base, id, data) => (Number(base) || 0) + (data.bonusXP?.[id] || 0
 // --- ZUSTAND STORE ---
 
 export const useGameStore = create((set, get) => ({
-  data: extendedInitialData,
+  data: initialData,
   userId: 'test-user-id', 
   loading: true,
   isSaving: false,
@@ -83,18 +79,16 @@ export const useGameStore = create((set, get) => ({
   loadGame: async () => {
     set({ loading: true });
     try {
-      // In a real app, fetch from Firebase here. 
-      // For now, we load from local storage or defaults.
       const localData = localStorage.getItem('vault_save_v1');
       if (localData) {
           const parsed = JSON.parse(localData);
-          set({ data: mergeData(extendedInitialData, parsed), loading: false });
+          set({ data: mergeData(initialData, parsed), loading: false });
       } else {
-          set({ data: extendedInitialData, loading: false });
+          set({ data: initialData, loading: false });
       }
     } catch (error) {
       console.error("Load Error:", error);
-      set({ data: extendedInitialData, loading: false });
+      set({ data: initialData, loading: false });
     }
   },
 
@@ -115,40 +109,74 @@ export const useGameStore = create((set, get) => ({
     return { data: { ...state.data, discipline: newVal } };
   }),
 
-  // Updated to include Salvage drops
+  // --- NEW SHOP ACTIONS ---
+  claimDailyAction: () => {
+    const state = get();
+    const now = Date.now();
+    if (now - state.data.lastDailyClaim < 86400000) return { success: false, message: "Already claimed today!" };
+
+    set(prev => {
+        // Reward: 5000 Discipline + 5 Salvage
+        const newSalvage = (prev.data.salvage || 0) + 5;
+        return {
+            data: {
+                ...prev.data,
+                lastDailyClaim: now,
+                discipline: prev.data.discipline + 5000,
+                salvage: newSalvage
+            }
+        };
+    });
+    return { success: true, message: "Daily Reward Claimed! +5000 BM, +5 Salvage" };
+  },
+
+  claimHourlyAction: () => {
+    const state = get();
+    const now = Date.now();
+    if (now - state.data.lastHourlyClaim < 3600000) return { success: false, message: "Hourly crate not ready." };
+
+    // Reward: Random basic item
+    const possibleRewards = [...SHOP_ITEMS.boosters]; // Simple pool for example
+    const reward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)];
+    
+    set(prev => {
+        const newInv = addToSlotArray([...prev.data.inventory], reward, 1) || prev.data.inventory;
+        return {
+            data: {
+                ...prev.data,
+                lastHourlyClaim: now,
+                inventory: newInv
+            }
+        };
+    });
+    return { success: true, message: `Hourly Crate: Found ${reward.name}!` };
+  },
+
   updateWellness: (type, amount) => {
     let result = { success: true, message: '' };
-    
     set((state) => {
         const currentVal = state.data.wellness[type];
-        
         if (amount < 0) {
             const newVal = Math.min(100, Math.max(0, currentVal + amount));
             return { data: { ...state.data, wellness: { ...state.data.wellness, [type]: newVal } } };
         }
-
         const newVal = Math.min(100, Math.max(0, currentVal + amount));
         const newStats = { ...state.data.statistics };
-        
         if (!newStats.maintenance) newStats.maintenance = { energy: 0, hydration: 0, focus: 0 };
         newStats.maintenance[type] = (newStats.maintenance[type] || 0) + 1;
 
         const baseReward = Math.floor(Math.random() * 11) + 10;
-        const avgWellness = (state.data.wellness.energy + state.data.wellness.hydration + state.data.wellness.focus) / 3;
-        const maintenanceBonus = Math.floor((avgWellness / 100) * 30);
-        const totalReward = Math.min(50, baseReward + maintenanceBonus);
-
+        const totalReward = Math.min(50, baseReward);
         const dropRoll = Math.random();
         let newInventory = [...state.data.inventory];
         let dropMsg = "";
         let newSalvage = state.data.salvage || 0;
         
-        // 10% Chance for Salvage
         if (dropRoll < 0.10) {
             const salvageAmount = Math.floor(Math.random() * 3) + 1;
             newSalvage += salvageAmount;
             dropMsg = ` & Found ${salvageAmount} Salvage!`;
-        } else if (dropRoll < 0.15) { // 5% Chance for Item (shifted range)
+        } else if (dropRoll < 0.15) { 
             const allItems = [...SHOP_ITEMS.boosters, ...SHOP_ITEMS.gear];
             const randomItem = allItems[Math.floor(Math.random() * allItems.length)];
             const updatedInv = addToSlotArray(newInventory, randomItem, 1);
@@ -157,9 +185,7 @@ export const useGameStore = create((set, get) => ({
                 dropMsg = ` & Found ${randomItem.name}!`;
             }
         }
-
         result.message = `+${totalReward} BM${dropMsg}`;
-
         return {
             data: {
                 ...state.data,
@@ -171,24 +197,21 @@ export const useGameStore = create((set, get) => ({
             }
         };
     });
-
     return result; 
   },
 
-  // Used for the new Header Timer ticker
   tickFocusSession: (baseRate, multiplier, timeAdded) => set((state) => ({
       data: {
           ...state.data,
           discipline: state.data.discipline + (baseRate + multiplier),
           wellness: {
               ...state.data.wellness,
-              focus: Math.max(0, state.data.wellness.focus - 0.05) // Slight decay per second
+              focus: Math.max(0, state.data.wellness.focus - 0.05) 
           }
       }
   })),
 
   completeFocusSession: (minutes) => {
-      // Legacy function kept for compatibility if needed, though header timer replaces it
       const state = get();
       const baseReward = Math.floor(minutes * 10 * (1 + (minutes / 100)));
       set(prev => ({
@@ -240,7 +263,7 @@ export const useGameStore = create((set, get) => ({
     }
     set(prev => {
         let newInv = addToSlotArray([...prev.data.inventory], item, 1);
-        if(!newInv) return prev; // Inventory full
+        if(!newInv) return prev; 
         return {
             data: {
                 ...prev.data,
@@ -259,7 +282,6 @@ export const useGameStore = create((set, get) => ({
         if (newInv[index].count > 1) newInv[index] = { ...newInv[index], count: newInv[index].count - 1 };
         else newInv[index] = null;
         
-        // Logic for item effects (simplified)
         let xpUpdates = {};
         if (item.type === 'Booster' && item.skillId) {
             xpUpdates = { [item.skillId]: (prev.data.bonusXP[item.skillId] || 0) + (item.xpAmount || 0) };
@@ -279,7 +301,7 @@ export const useGameStore = create((set, get) => ({
 
   handleSellCardAction: (cardId, value) => {
     set(prev => {
-        const newCards = prev.data.cards.filter(c => c !== cardId); // Simplistic removal
+        const newCards = prev.data.cards.filter(c => c !== cardId); 
         return {
             data: {
                 ...prev.data,
@@ -312,7 +334,6 @@ export const useGameStore = create((set, get) => ({
   },
 
   handleClaimMasteryRewardAction: (skillId, level, reward) => {
-    // Logic to add reward to inventory and mark as claimed
     return { success: true, message: `Claimed ${reward.name}!` };
   },
 
@@ -320,7 +341,6 @@ export const useGameStore = create((set, get) => ({
     const state = get();
     const data = state.data;
     
-    // XP Calculation logic
     const incXP = getXP(data.lifetime.totalIncomeBase * 10, 'inc', data); 
     const codXP = getXP(35000 + ((data.assets?.digitalIP || 0) * 5), 'cod', data);
     const cntXP = getXP(15000 + ((data.assets?.audience || 0) * 50), 'cnt', data);

@@ -14,11 +14,11 @@ import {
   Box, Dna, Hexagon, Server, Globe, Wifi, Database, Key,
   MousePointer, GripVertical, Settings, Sliders, Crown, Gift,
   Building, Landmark, Gavel, Filter, Watch, Mic, Library, Archive,
-  Trash2, Bed, Bath, Utensils, Expand
+  Trash2, Bed, Bath, Utensils, Expand, Wrench, Play, Pause, Aperture
 } from 'lucide-react';
 
 export const USER_NAME = "Justin";
-export const CURRENT_VERSION = "v32.0"; // Added Widget Database
+export const CURRENT_VERSION = "v32.0"; 
 export const INVENTORY_SLOTS = 28;
 export const BANK_SLOTS = 50;
 export const MAX_SKILL_LEVEL = 99;
@@ -28,6 +28,28 @@ export const CONTRACTS_PER_PAGE = 5;
 export const CARDS_PER_PAGE = 8;
 export const PLOT_COST = 1000;
 export const MAX_GRID_DIMENSION = 10;
+
+// --- NEW: GLOBAL CONSTANTS (Solves Magic Numbers) ---
+export const CONSTANTS = {
+  TIME: {
+    SECONDS_IN_MONTH: 2629746,
+    DAILY_MS: 86400000,
+    HOURLY_MS: 3600000,
+  },
+  TOAST: {
+    SUCCESS: 'success',
+    ERROR: 'error',
+    INFO: 'info',
+  },
+  UI: {
+    COLORS: {
+      SUCCESS: 'text-emerald-400',
+      ERROR: 'text-rose-400',
+      WARNING: 'text-amber-400',
+      INFO: 'text-blue-400',
+    }
+  }
+};
 
 // --- STATIC DATA: SKILL DETAILS ---
 export const SKILL_DETAILS = {
@@ -88,6 +110,13 @@ export const SHOP_ITEMS = {
     { id: 'b13', name: "Audience Workshop", cost: 700, effect: "+7,000 Content XP", iconName: "Target", skillId: 'cnt', xpAmount: 7000, color: "text-pink-400", rarity: "Rare", type: "Booster" },
   ],
   gear: [
+    { id: 'd1', name: 'Plot Deed', iconName: 'Map', cost: 150000, rarity: 'Rare', effect: 'Grants ownership of a standard 16x16 land plot.', type: 'Deed' },
+    { id: 'd2', name: 'Estate Deed', iconName: 'Home', cost: 500000, rarity: 'Epic', effect: 'Permanent 10% reduction on property tax.', type: 'Deed' },
+    { id: 'd3', name: 'Business Deed', iconName: 'Trophy', cost: 2500000, rarity: 'Legendary', effect: 'License to operate a player-owned vendor stall.', type: 'Deed' },
+    { id: 'd4', name: 'Car Deed', iconName: 'Car', cost: 75000, rarity: 'Uncommon', effect: 'Title to a basic utility vehicle.', type: 'Deed' },
+    { id: 'd5', name: 'Boat Deed', iconName: 'Ship', cost: 125000, rarity: 'Rare', effect: 'Title to a small watercraft.', type: 'Deed' },
+    { id: 'd6', name: 'Plane Deed', iconName: 'Aperture', cost: 15000000, rarity: 'Mythic', effect: 'Title to a private jet.', type: 'Deed' },
+    { id: 'd7', name: 'Helicopter Deed', iconName: 'Cpu', cost: 7500000, rarity: 'Legendary', effect: 'Title to a transport helicopter.', type: 'Deed' },
     { id: 'g1', name: "Estate Deed", cost: 50000, effect: "Unlocks Estate Planning", iconName: "Building", rarity: "Legendary", color: "text-amber-400", type: "Item" },
     { id: 'g2', name: "Server Farm", cost: 15000, effect: "Passive Income Gen", iconName: "Server", rarity: "Epic", color: "text-blue-500", type: "Item" },
     { id: 'g3', name: "Angel Syndicate", cost: 10000, effect: "Access to Deal Flow", iconName: "Users", rarity: "Epic", color: "text-purple-500", type: "Item" },
@@ -100,12 +129,18 @@ export const SHOP_ITEMS = {
     { id: 'g10', name: "Green Screen", cost: 600, effect: "+Content Polish", iconName: "Grid", rarity: "Uncommon", color: "text-green-500", type: "Item" }
   ],
   packs: [
-    { id: 'p1', name: "Standard Pack", cost: 500, effect: "3 Cards", iconName: "Package", rarity: "Common", color: "text-white", type: "Pack", cardCount: 3, weights: { c: 60, u: 30, r: 8, e: 1.9, l: 0.1 } },
-    { id: 'p2', name: "Epic Pack", cost: 1200, effect: "5 Cards (Better Odds)", iconName: "Sparkles", rarity: "Epic", color: "text-purple-400", type: "Pack", cardCount: 5, weights: { c: 20, u: 40, r: 30, e: 9, l: 1 } },
+    { id: 'p1', name: "Standard Pack", cost: 500, effect: "3 Cards", iconName: "Layers", rarity: "Common", color: "text-white", type: "Pack", cardCount: 3, weights: { c: 60, u: 30, r: 8, e: 1.9, l: 0.1 } },
+    { id: 'p2', name: "Epic Pack", cost: 1200, effect: "5 Cards (Better Odds)", iconName: "Zap", rarity: "Epic", color: "text-purple-400", type: "Pack", cardCount: 5, weights: { c: 20, u: 40, r: 30, e: 9, l: 1 } },
     { id: 'p3', name: "Legend Pack", cost: 2500, effect: "5 Cards (High Odds)", iconName: "Crown", rarity: "Legendary", color: "text-amber-400", type: "Pack", cardCount: 5, weights: { c: 0, u: 10, r: 40, e: 40, l: 10 } },
-    { id: 'bx1', name: "Standard Box", cost: 2000, effect: "5x Standard Packs", iconName: "Box", rarity: "Common", color: "text-white", type: "Box", packId: 'p1', count: 5 },
-    { id: 'bx2', name: "Epic Box", cost: 4800, effect: "5x Epic Packs", iconName: "Box", rarity: "Epic", color: "text-purple-400", type: "Box", packId: 'p2', count: 5 },
-    { id: 'bx3', name: "Legend Box", cost: 10000, effect: "5x Legend Packs", iconName: "Box", rarity: "Legendary", color: "text-amber-400", type: "Box", packId: 'p3', count: 5 },
+    { id: 'p4', name: 'Standard Box', iconName: 'Archive', cost: 2000, rarity: 'Common', type: "Box", effect: 'A bundle of 5 Standard Packs.', packId: 'p1', count: 5 },
+    { id: 'p5', name: 'Epic Box', iconName: 'Archive', cost: 8000, rarity: 'Epic', type: "Box", effect: 'A bundle of 5 Epic Packs.', packId: 'p2', count: 5 },
+    { id: 'p6', name: 'Legend Box', iconName: 'Archive', cost: 30000, rarity: 'Legendary', type: "Box", effect: 'A premium bundle of 5 Legend Packs.', packId: 'p3', count: 5 },
+  ],
+  crates: [
+    { id: 'lf_hourly', name: 'Hourly Supply Crate', iconName: 'Sun', cost: 0, rarity: 'Common', isHourlyClaim: true, effect: 'A free hourly supply drop.', type: 'Crate' },
+    { id: 'lf4', name: 'Standard Loot Crate', iconName: 'Package', cost: 1000, rarity: 'Common', effect: 'A basic crate containing 2-3 inventory items.', type: 'Crate' },
+    { id: 'lf5', name: 'Epic Loot Crate', iconName: 'Gift', cost: 15000, rarity: 'Epic', effect: 'A quality crate with high-value items.', type: 'Crate' },
+    { id: 'lf6', name: 'Legendary Loot Crate', iconName: 'Star', cost: 50000, rarity: 'Legendary', effect: 'The ultimate prize. Mythic possibility is high.', type: 'Crate' },
   ]
 };
 
@@ -140,9 +175,12 @@ export const initialData = {
   setupComplete: true, 
   lastVersion: null, 
   cash: 5000,
-  discipline: 5000, 
+  discipline: 5000,
+  salvage: 0, 
   streak: 0, 
   lastMaintenance: null,
+  lastDailyClaim: 0,
+  lastHourlyClaim: 0,
   monthlyExpenses: 3200,
   monthlyIncome: 4500,
   bonusXP: { inc: 0, cod: 0, cnt: 0, ai: 0, sec: 300, vit: 0, wis: 0, net: 0, ast: 0, flo: 0, inv: 0, est: 0, dis: 0 },
@@ -209,11 +247,7 @@ export const initialData = {
     productivity_timer: true,
     task_command_center: true, 
     todo_list: true,
-    
-    // Defaulting these to false, they are available in the Widget DB
     player_card: false, active_contracts: false, financial_overview: false, mastery_log_widget: false,
-    
-    // Other fixed widgets kept true for completeness
     p_vitals: true, unified_menu: true, mastery_log_btn: true, asset_wallet: true, 
   },
   

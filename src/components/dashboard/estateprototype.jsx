@@ -21,9 +21,8 @@ import {
   ChevronLeft, ChevronRight as ChevronRightIcon, PanelRightClose, PanelRightOpen
 } from 'lucide-react';
 import { RenderIcon } from './dashboardutils'; 
-import { ESTATE_ROOMS } from '../../data/gamedata'; // Assuming ESTATE_ROOMS are exported from gamedata now
+import { ESTATE_ROOMS } from '../../data/gamedata'; // Corrected import
 
-// Re-defining locally if not imported to be safe, based on previous context.
 const PLOT_COST = 1000;
 const MAX_GRID_DIMENSION = 10;
 
@@ -145,7 +144,6 @@ export default function EstatePrototype({ discipline: parentDiscipline = 5000, s
                         <div 
                             key={i}
                             onClick={() => handleSlotClick(i)}
-                            // MODIFIED: Default background for owned plots is now Green-ish (emerald-900/40) instead of white/5
                             className={`
                                 relative rounded-md border-2 flex flex-col items-center justify-center transition-all cursor-pointer group overflow-hidden aspect-square
                                 ${isBuilt 
@@ -153,7 +151,7 @@ export default function EstatePrototype({ discipline: parentDiscipline = 5000, s
                                     : isOwned 
                                         ? pendingBuildItem 
                                             ? (pendingBuildItem.isDeed ? 'bg-red-900/20 border-red-500/30' : 'bg-emerald-900/50 border-emerald-500/70 animate-pulse')
-                                            : 'bg-emerald-900/40 border-emerald-500/30 hover:bg-emerald-800/50 hover:border-emerald-400' // <-- GREEN BACKGROUND HERE
+                                            : 'bg-emerald-900/40 border-emerald-500/30 hover:bg-emerald-800/50 hover:border-emerald-400'
                                         : pendingBuildItem?.isDeed
                                             ? 'bg-emerald-900/20 border-emerald-500/50 hover:bg-emerald-900/40 animate-pulse' 
                                             : 'bg-black/40 border-slate-800/50 hover:border-amber-700/50' 
@@ -199,7 +197,7 @@ export default function EstatePrototype({ discipline: parentDiscipline = 5000, s
              <div className="flex justify-between items-center text-xs"><span className="text-slate-500 uppercase font-bold">Balance</span><span className="font-mono text-emerald-400 font-bold">{discipline.toLocaleString()} DSC</span></div>
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
-             {sidebarTab === 'shop' && <div className="grid grid-cols-2 gap-3">{ESTATE_ITEMS.map(item => <button key={item.id} onClick={() => handleSelectShopItem(item)} disabled={discipline < item.cost} className={`relative p-3 rounded-lg border flex flex-col items-center text-center gap-2 transition-all group ${pendingBuildItem?.id === item.id ? 'ring-2 ring-amber-500 bg-slate-800' : ''} ${discipline >= item.cost ? 'bg-slate-800/50 border-slate-700 hover:border-amber-500 hover:bg-slate-800' : 'bg-slate-900/50 border-slate-800 opacity-50 cursor-not-allowed'}`}>{item.isExpansion && <div className="absolute top-1 right-1 text-[8px] bg-purple-900/80 text-purple-200 px-1 rounded uppercase font-bold">Expand</div>}{item.isBundle && <div className="absolute top-1 right-1 text-[8px] bg-blue-900/80 text-blue-200 px-1 rounded uppercase font-bold">Bundle</div>}{item.isDeed && <div className="absolute top-1 right-1 text-[8px] bg-emerald-900/80 text-emerald-200 px-1 rounded uppercase font-bold">Land</div>}<div className={`p-2 rounded-full bg-black/30 ${discipline >= item.cost ? 'text-amber-500 group-hover:text-white' : 'text-slate-600'}`}><RenderIcon name={item.icon} size={20}/></div><div className="w-full"><div className="text-[10px] font-bold text-white truncate">{item.name}</div><div className="text-[9px] text-slate-500 font-mono">{item.cost.toLocaleString()}</div></div><div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center p-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg backdrop-blur-sm pointer-events-none"><p className="text-[10px] text-slate-300 leading-tight mb-2">{item.desc}</p><span className="text-[9px] font-bold text-emerald-400">Click to Build</span></div></button>)}</div>}
+             {sidebarTab === 'shop' && <div className="grid grid-cols-2 gap-3">{ESTATE_ROOMS.map(item => <button key={item.id} onClick={() => handleSelectShopItem(item)} disabled={discipline < item.cost} className={`relative p-3 rounded-lg border flex flex-col items-center text-center gap-2 transition-all group ${pendingBuildItem?.id === item.id ? 'ring-2 ring-amber-500 bg-slate-800' : ''} ${discipline >= item.cost ? 'bg-slate-800/50 border-slate-700 hover:border-amber-500 hover:bg-slate-800' : 'bg-slate-900/50 border-slate-800 opacity-50 cursor-not-allowed'}`}>{item.isExpansion && <div className="absolute top-1 right-1 text-[8px] bg-purple-900/80 text-purple-200 px-1 rounded uppercase font-bold">Expand</div>}{item.isBundle && <div className="absolute top-1 right-1 text-[8px] bg-blue-900/80 text-blue-200 px-1 rounded uppercase font-bold">Bundle</div>}{item.isDeed && <div className="absolute top-1 right-1 text-[8px] bg-emerald-900/80 text-emerald-200 px-1 rounded uppercase font-bold">Land</div>}<div className={`p-2 rounded-full bg-black/30 ${discipline >= item.cost ? 'text-amber-500 group-hover:text-white' : 'text-slate-600'}`}><RenderIcon name={item.icon} size={20}/></div><div className="w-full"><div className="text-[10px] font-bold text-white truncate">{item.name}</div><div className="text-[9px] text-slate-500 font-mono">{item.cost.toLocaleString()}</div></div><div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center p-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg backdrop-blur-sm pointer-events-none"><p className="text-[10px] text-slate-300 leading-tight mb-2">{item.desc}</p><span className="text-[9px] font-bold text-emerald-400">Click to Build</span></div></button>)}</div>}
              {sidebarTab === 'bonuses' && <div className="space-y-2">{filteredBonuses.length > 0 ? filteredBonuses.map(room => { const count = roomCounts[room.id]; return <div key={room.id} className="p-3 rounded border border-slate-700 bg-slate-800/50 flex justify-between items-center"><div className="flex items-center gap-3"><div className="p-1.5 bg-black/30 rounded text-blue-400"><RenderIcon name={room.icon} size={16}/></div><div><div className="text-xs font-bold text-white">{room.name}</div><div className="text-[9px] text-slate-400">{room.desc}</div></div></div><div className="text-xs font-mono font-bold text-emerald-400">x{count}</div></div> }) : <div className="text-center p-8 text-slate-500 text-xs italic border border-dashed border-slate-700 rounded-lg">No active facilities.</div>}</div>}
           </div>
       </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useGameStore } from '../../store/gamestore'; 
-import { SHOP_ITEMS, CARD_DATABASE, SKILL_DETAILS, WIDGET_DATABASE } from '../../data/gamedata'; 
-import { WellnessBar, InventoryGrid, ContractWidget, MasteryModal, InputGroup, InputField } from './dashboardui'; 
+import { SHOP_ITEMS, CARD_DATABASE, SKILL_DETAILS, WIDGET_DATABASE, CONSTANTS } from '../../data/gamedata'; 
+import { InventoryGrid, ContractWidget, MasteryModal, InputGroup, InputField } from './dashboardui'; 
 import { RenderIcon } from './dashboardutils';
 import ShopFullPage from './shopfullpage'; 
 import EstatePrototype from './estateprototype';
@@ -12,13 +12,34 @@ import TodoList from './todo_list';
 import StatisticsTab from './statisticstab';
 import InventoryView from './inventoryprototype'; 
 
+// --- WIDGET REGISTRY ---
+const PlayerCardWidget = ({ combatStats }) => (
+    <div className="p-4 flex items-center gap-3">
+        <div className="w-12 h-12 bg-slate-700 rounded-full flex items-center justify-center text-2xl">🧙‍♂️</div>
+        <div>
+            <div className="font-bold text-white">Lvl {combatStats.totalLevel} Architect</div>
+            <div className="text-xs text-amber-500 font-mono">Combat: {combatStats.combatLevel}</div>
+        </div>
+    </div>
+);
+
+const WIDGET_REGISTRY = {
+    'todo_list': TodoList,
+    'productivity_timer': ProductivityTimerWidget,
+    'task_command_center': TaskCommandCenterWidget,
+    'player_card': PlayerCardWidget,
+    'active_contracts': ({ data, toggleAchievement }) => (
+        <div className="p-0 h-full"><ContractWidget contracts={data.achievements} onToggle={toggleAchievement} /></div>
+    ),
+};
+
 export default function VaultDashboard() {
   const { 
     data, loading, loadGame, saveGame, updateWellness, setDiscipline, 
     updateNestedData, updateData, purchaseItemAction, 
     handleUseItemAction, handleSellCardAction, toggleAchievementAction, 
     handleClaimMasteryRewardAction, pendingPackOpen, getSkillData,
-    tickFocusSession 
+    tickFocusSession, claimDailyAction, claimHourlyAction
   } = useGameStore();
 
   useEffect(() => { loadGame(); setInterval(saveGame, 60000); }, []);
@@ -32,17 +53,14 @@ export default function VaultDashboard() {
   const [focusActive, setFocusActive] = useState(false);
   const [focusElapsed, setFocusElapsed] = useState(0);
 
-  // Focus Timer Logic (Upward counting, 3 BM/s base, +multiplier capped at 10)
   useEffect(() => {
       let interval = null;
       if (focusActive) {
           interval = setInterval(() => {
               setFocusElapsed(prev => {
                   const newTime = prev + 1;
-                  // Base: 3. Multiplier: +1 every 60s. Cap: 10.
                   const multiplier = Math.floor(newTime / 60);
-                  const rate = Math.min(10, 3 + multiplier);
-                  tickFocusSession(3, Math.min(7, multiplier)); // 3 base + multiplier (max 7) = 10 max
+                  tickFocusSession(3, Math.min(7, multiplier)); 
                   return newTime;
               });
           }, 1000);
@@ -83,6 +101,16 @@ export default function VaultDashboard() {
   const toggleAchievement = (id) => { const r = toggleAchievementAction(id, !data.achievements.find(a=>a.id===id).completed); if(r.success) showToast(r.rewardMsg || 'Updated', 'success'); };
   const handleClaimMasteryReward = (sId, lvl, rwd) => { const r = handleClaimMasteryRewardAction(sId, lvl, rwd); if(r.success) { setSkillModal(null); showToast(r.message, 'success'); } else showToast(r.message, 'error'); };
   
+  const handleClaimDaily = () => {
+      const r = claimDailyAction();
+      showToast(r.message, r.success ? 'success' : 'error');
+  };
+
+  const handleClaimHourly = () => {
+      const r = claimHourlyAction();
+      showToast(r.message, r.success ? 'success' : 'error');
+  };
+
   const handleMaintainVital = (type) => {
       const result = updateWellness(type, 20);
       if (result && result.message) showToast(result.message, 'success');
@@ -97,9 +125,9 @@ export default function VaultDashboard() {
   const { calculatedSkills: playerSkills, totalXPs } = useMemo(() => getSkillData(), [data, getSkillData]);
   const combatStats = useMemo(() => ({ totalLevel: playerSkills.reduce((s,x)=>s+x.level,0), combatLevel: Math.floor(playerSkills.reduce((s,x)=>s+x.level,0)/4) }), [playerSkills]);
   
-  // Calculate $/Sec based on Monthly Net Income
+  // USE CONSTANT instead of Magic Number
   const monthlyNetIncome = (data.monthlyIncome || 0) - (data.monthlyExpenses || 0);
-  const dollarsPerSecond = (monthlyNetIncome / 2629746).toFixed(4); 
+  const dollarsPerSecond = (monthlyNetIncome / CONSTANTS.TIME.SECONDS_IN_MONTH).toFixed(4); 
 
   // --- RESIZING/DRAG LOGIC ---
   useEffect(() => {
@@ -156,10 +184,14 @@ export default function VaultDashboard() {
   const renderWidget = (widgetId, location) => {
     const isVisible = data.widgetConfig?.[widgetId];
     if (!isVisible && !editMode) return null;
+
+    const WidgetComponent = WIDGET_REGISTRY[widgetId];
+    if (!WidgetComponent) return null;
+
     const sizeClass = location === 'center' ? (data.layout.home.widgetSizes?.[widgetId] || 'col-span-1') : '';
     const baseClass = `rounded-xl border shadow-lg relative transition-all flex flex-col mb-4 overflow-hidden ${editMode ? 'border-dashed border-slate-500 hover:bg-slate-800/50 cursor-move' : 'bg-[#1e1e1e] border-[#404e6d]'} ${sizeClass}`;
-    
-    const WidgetWrapper = ({ children, widgetId }) => (
+
+    return (
         <div 
             className={`${baseClass} h-fit min-h-[100px] mb-4 ${!isVisible && editMode ? 'opacity-50' : ''}`}
             draggable={editMode}
@@ -173,18 +205,13 @@ export default function VaultDashboard() {
                     <button onClick={(e) => { e.stopPropagation(); updateData(p => ({ widgetConfig: { ...p.widgetConfig, [widgetId]: !p.widgetConfig[widgetId] } })); }} className="p-1 bg-black/50 rounded text-white hover:bg-black" title="Toggle Visibility"><RenderIcon name={isVisible ? "Eye" : "EyeOff"} size={12}/></button>
                 </div>
             )}
-            {children}
+            <WidgetComponent 
+                data={data} 
+                combatStats={combatStats} 
+                toggleAchievement={toggleAchievement}
+            />
         </div>
     );
-
-    switch(widgetId) {
-        case 'todo_list': return <div className={`${baseClass} h-full`}><TodoList /></div>;
-        case 'productivity_timer': return <WidgetWrapper widgetId={widgetId}><ProductivityTimerWidget /></WidgetWrapper>;
-        case 'task_command_center': return <WidgetWrapper widgetId={widgetId}><TaskCommandCenterWidget /></WidgetWrapper>;
-        case 'player_card': return <WidgetWrapper widgetId={widgetId}><div className="p-4 flex items-center gap-3"><div className="w-12 h-12 bg-slate-700 rounded-full flex items-center justify-center text-2xl">🧙‍♂️</div><div><div className="font-bold text-white">Lvl {combatStats.totalLevel} Architect</div><div className="text-xs text-amber-500 font-mono">Combat: {combatStats.combatLevel}</div></div></div></WidgetWrapper>;
-        case 'active_contracts': return <WidgetWrapper widgetId={widgetId}><div className="p-0 h-full"><ContractWidget contracts={data.achievements} onToggle={toggleAchievement} /></div></WidgetWrapper>;
-        default: return null;
-    }
   };
 
   const renderWidgetDatabase = () => (
@@ -223,7 +250,6 @@ export default function VaultDashboard() {
                     <div className="font-bold text-white leading-none">THE VAULT</div>
                     <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono mt-1">
                         <span className="flex items-center gap-1 text-emerald-400 font-bold bg-black/30 px-2 py-0.5 rounded"><RenderIcon name="DollarSign" size={10} /> {data.cash.toLocaleString()}</span>
-                        {/* ENHANCED BRAIN MATTER GRAPHIC IN HEADER */}
                         <span className="flex items-center gap-1 text-pink-400 font-bold bg-black/30 px-2 py-0.5 rounded">
                             <div className="p-0.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 shadow-lg shadow-pink-900/50">
                                 <RenderIcon name="Brain" size={10} className="text-white"/>
@@ -295,59 +321,26 @@ export default function VaultDashboard() {
         {/* --- HOME TAB --- */}
         {activeTab === 'dynamic' && (
             <div className="flex h-[calc(100vh-100px)] overflow-hidden">
-                
-                {/* 1. LEFT: COLLAPSIBLE PANEL */}
-                <div 
-                    className={`transition-all duration-200 border-r border-slate-700 bg-[#161b22] relative flex flex-col shrink-0 z-[70] ${isTodoCollapsed ? 'w-14 items-center py-4' : ''}`} 
-                    style={{ width: isTodoCollapsed ? '3.5rem' : `${leftPanelWidth}px` }}
-                >
+                {/* LEFT: COLLAPSIBLE PANEL */}
+                <div className={`transition-all duration-200 border-r border-slate-700 bg-[#161b22] relative flex flex-col shrink-0 z-[70] ${isTodoCollapsed ? 'w-14 items-center py-4' : ''}`} style={{ width: isTodoCollapsed ? '3.5rem' : `${leftPanelWidth}px` }}>
                     {!isTodoCollapsed && <div className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-slate-600/50 z-20" onMouseDown={(e)=>{e.preventDefault(); setIsResizing('left')}}/>}
-                    
-                    {/* Collapsed State: Vertical Stack of Buttons (Aligned) */}
                     {isTodoCollapsed ? (
                         <div className="flex flex-col gap-4 items-center w-full">
-                            {/* Expander */}
-                            <button 
-                                onClick={() => setIsTodoCollapsed(false)} 
-                                className="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded-lg border border-slate-500 shadow-md transition-colors"
-                                title="Expand Panel"
-                            >
-                                <RenderIcon name="ChevronRight" size={16}/>
-                            </button>
-                            
+                            <button onClick={() => setIsTodoCollapsed(false)} className="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded-lg border border-slate-500 shadow-md transition-colors"><RenderIcon name="ChevronRight" size={16}/></button>
                             <div className="w-8 h-px bg-slate-700"></div>
-
-                            {/* Icons for Tabs */}
-                            <button onClick={() => { setIsTodoCollapsed(false); setLeftPanelSubTab('tasks'); }} className="group relative p-2 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors">
-                                <RenderIcon name="List" size={20}/>
-                                <span className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2 py-1 bg-black border border-slate-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[80] pointer-events-none shadow-xl">Tasks</span>
-                            </button>
-                            
-                            <button onClick={() => { setIsTodoCollapsed(false); setLeftPanelSubTab('widgets'); }} className="group relative p-2 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors">
-                                <RenderIcon name="Grid" size={20}/>
-                                <span className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2 py-1 bg-black border border-slate-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[80] pointer-events-none shadow-xl">Widget DB</span>
-                            </button>
+                            <button onClick={() => { setIsTodoCollapsed(false); setLeftPanelSubTab('tasks'); }} className="group relative p-2 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors"><RenderIcon name="List" size={20}/></button>
+                            <button onClick={() => { setIsTodoCollapsed(false); setLeftPanelSubTab('widgets'); }} className="group relative p-2 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors"><RenderIcon name="Grid" size={20}/></button>
                         </div>
                     ) : (
-                        // Expanded View
                         <div className={`flex-1 overflow-hidden flex flex-col w-full`}>
-                            {/* Expanded Header with Retract Button Inside */}
                             <div className="flex items-center justify-between p-3 border-b border-slate-700 bg-[#131313]">
                                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Sidebar</span>
-                                <button 
-                                    onClick={() => setIsTodoCollapsed(true)} 
-                                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded border border-slate-600 transition-colors"
-                                    title="Collapse Panel"
-                                >
-                                    <RenderIcon name="ChevronLeft" size={14}/>
-                                </button>
+                                <button onClick={() => setIsTodoCollapsed(true)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded border border-slate-600 transition-colors"><RenderIcon name="ChevronLeft" size={14}/></button>
                             </div>
-
                             <div className="flex justify-around p-2 border-b border-slate-700 bg-[#161b22]">
                                 <button onClick={() => setLeftPanelSubTab('tasks')} className={`flex-1 py-1.5 text-xs font-bold rounded transition-colors ${leftPanelSubTab === 'tasks' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Tasks</button>
                                 <button onClick={() => setLeftPanelSubTab('widgets')} className={`flex-1 py-1.5 text-xs font-bold rounded transition-colors ${leftPanelSubTab === 'widgets' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Widget DB</button>
                             </div>
-
                             <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
                                 {leftPanelSubTab === 'tasks' ? (
                                     <div className="p-4 h-full flex flex-col gap-4">
@@ -357,7 +350,6 @@ export default function VaultDashboard() {
                                     renderWidgetDatabase()
                                 )}
                             </div>
-                            
                             <div className="p-4 border-t border-slate-700 bg-[#131313]">
                                 <button onClick={() => setEditMode(!editMode)} className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded text-xs font-bold border transition-colors ${editMode ? 'bg-amber-500 text-black border-amber-600' : 'bg-slate-800 text-slate-300 border-slate-600 hover:bg-slate-700'}`}>
                                     <RenderIcon name="Edit3" size={14}/> {editMode ? 'FINISH EDITING' : 'EDIT DASHBOARD LAYOUT'}
@@ -367,7 +359,7 @@ export default function VaultDashboard() {
                     )}
                 </div>
 
-                {/* 2. CENTER: GRID */}
+                {/* CENTER: GRID */}
                 <div className="flex-1 overflow-y-auto p-6 bg-[#0f1219]">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto pb-10">
                         {data.layout.home.center.map((w, i) => (
@@ -378,51 +370,22 @@ export default function VaultDashboard() {
                     </div>
                 </div>
 
-                {/* 3. RIGHT: COLLAPSIBLE PANEL */}
-                <div 
-                    className={`transition-all duration-200 border-l border-slate-700 bg-[#1a1a1a] flex flex-col shrink-0 relative z-[70] ${isRightCollapsed ? 'w-14 items-center py-4' : ''}`} 
-                    style={{ width: isRightCollapsed ? '3.5rem' : `${rightPanelWidth}px` }}
-                >
+                {/* RIGHT: COLLAPSIBLE PANEL */}
+                <div className={`bg-[#1a1a1a] border-l border-slate-700 flex flex-col shrink-0 relative transition-all duration-200 z-[70] ${isRightCollapsed ? 'w-14 items-center py-4' : ''}`} style={{ width: isRightCollapsed ? '3.5rem' : `${rightPanelWidth}px` }}>
                     {!isRightCollapsed && <div className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-slate-600/50 z-20" onMouseDown={(e)=>{e.preventDefault(); setIsResizing('right')}}/>}
-                    
-                    {/* Collapsed State: Vertical Stack */}
                     {isRightCollapsed ? (
                         <div className="flex flex-col gap-4 items-center w-full">
-                            {/* Expander */}
-                            <button 
-                                onClick={() => setIsRightCollapsed(false)} 
-                                className="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded-lg border border-slate-500 shadow-md transition-colors"
-                                title="Expand Panel"
-                            >
-                                <RenderIcon name="ChevronLeft" size={16}/>
-                            </button>
-
+                            <button onClick={() => setIsRightCollapsed(false)} className="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded-lg border border-slate-500 shadow-md transition-colors"><RenderIcon name="ChevronLeft" size={16}/></button>
                             <div className="w-8 h-px bg-slate-700"></div>
-
-                            <button onClick={() => { setIsRightCollapsed(false); setRightPanelTab('skills'); }} className="group relative p-2 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors">
-                                <RenderIcon name="Scroll" size={20}/>
-                                <span className="absolute right-full top-1/2 -translate-y-1/2 mr-3 px-2 py-1 bg-black border border-slate-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[80] pointer-events-none shadow-xl">Skills</span>
-                            </button>
-                            <button onClick={() => { setIsRightCollapsed(false); setRightPanelTab('inventory'); }} className="group relative p-2 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors">
-                                <RenderIcon name="Package" size={20}/>
-                                <span className="absolute right-full top-1/2 -translate-y-1/2 mr-3 px-2 py-1 bg-black border border-slate-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[80] pointer-events-none shadow-xl">Inventory</span>
-                            </button>
+                            <button onClick={() => { setIsRightCollapsed(false); setRightPanelTab('skills'); }} className="group relative p-2 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors"><RenderIcon name="Scroll" size={20}/></button>
+                            <button onClick={() => { setIsRightCollapsed(false); setRightPanelTab('inventory'); }} className="group relative p-2 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors"><RenderIcon name="Package" size={20}/></button>
                         </div>
                     ) : (
-                        // Expanded Content
                         <div className={`flex-1 flex flex-col overflow-hidden opacity-100 w-full`}>
-                            {/* Expanded Header */}
                             <div className="flex items-center justify-between p-3 border-b border-slate-800 bg-[#131313]">
-                                <button 
-                                    onClick={() => setIsRightCollapsed(true)} 
-                                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded border border-slate-600 transition-colors"
-                                    title="Collapse Panel"
-                                >
-                                    <RenderIcon name="ChevronRight" size={14}/>
-                                </button>
+                                <button onClick={() => setIsRightCollapsed(true)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded border border-slate-600 transition-colors"><RenderIcon name="ChevronRight" size={14}/></button>
                                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Resources</span>
                             </div>
-
                             <div className="p-2 border-b border-slate-800 bg-[#131313] flex justify-center gap-1">
                                 {['skills', 'inventory'].map(t => (
                                     <button key={t} onClick={() => setRightPanelTab(t)} className={`flex-1 py-1.5 text-xs font-bold uppercase rounded transition-colors ${rightPanelTab===t ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white'}`}>{t}</button>
@@ -470,7 +433,17 @@ export default function VaultDashboard() {
             </div>
         )}
 
-        {activeTab === 'shop' && <ShopFullPage onPurchase={purchaseItem} discipline={data.discipline} inventory={data.inventory} />}
+        {activeTab === 'shop' && (
+            <ShopFullPage 
+                onPurchase={purchaseItem} 
+                discipline={data.discipline} 
+                inventory={data.inventory} 
+                lastDailyClaim={data.lastDailyClaim}
+                lastHourlyClaim={data.lastHourlyClaim}
+                onClaimDaily={handleClaimDaily}
+                onClaimHourly={handleClaimHourly}
+            />
+        )}
       </main>
     </div>
   );
