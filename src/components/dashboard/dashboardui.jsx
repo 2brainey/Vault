@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom'; 
 import { 
     CheckCircle, Circle, ArrowRight, ArrowLeft, 
     HelpCircle, Lock as LockIcon, X, Trophy, Sparkles, Gift,
-    Briefcase, DollarSign, Coins, Package, Tag, List, Brain, Lock, Wrench
+    Briefcase, DollarSign, Coins, Package, Tag, List, Brain, Lock
 } from 'lucide-react'; 
 
 import { CARD_DATABASE, CONTRACTS_PER_PAGE, CARDS_PER_PAGE, SKILL_DETAILS, INVENTORY_SLOTS } from '../../data/gamedata';
@@ -131,7 +132,7 @@ export const MasteryModal = ({ skill, onClose, onClaimReward, claimedLevels }) =
                       <div>
                         <div className="flex items-center gap-2 mb-1">
                           <h4 className={`font-bold ${isUnlocked ? 'text-white' : 'text-slate-500'}`}>{unlock.title}</h4>
-                          {isUnlocked ? <RenderIcon name="CheckCircle" size={16} className="text-emerald-500"/> : <RenderIcon name="Lock" size={14} className="text-slate-600"/>}
+                          {isUnlocked ? <CheckCircleIcon /> : <RenderIcon name="Lock" size={14} className="text-slate-600"/>}
                         </div>
                         <p className="text-sm text-slate-400">{unlock.desc}</p>
                       </div>
@@ -161,10 +162,15 @@ export const MasteryModal = ({ skill, onClose, onClaimReward, claimedLevels }) =
     );
 };
 
-// --- INVENTORY GRID ---
-export const InventoryGrid = ({ slots: inventory, mp, cash, salvage, onUseItem, onDragStart, onDrop, onContextMenu, containerId }) => {
+// --- INVENTORY GRID (FIXED PORTAL + HANDLERS) ---
+export const InventoryGrid = ({ slots: inventory, mp, onUseItem, onDragStart, onDrop, onContextMenu, containerId }) => {
   const safeSlots = Array.isArray(inventory) ? inventory : new Array(INVENTORY_SLOTS).fill(null);
+  
+  // State for Portal Tooltip
+  const [hoveredItem, setHoveredItem] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
+  // --- Handlers Definitions ---
   const handleDragStartLocal = (e, index) => {
     if (!safeSlots[index]) {
         e.preventDefault();
@@ -175,8 +181,30 @@ export const InventoryGrid = ({ slots: inventory, mp, cash, salvage, onUseItem, 
   };
 
   const handleDragOver = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; };
-  const handleDropLocal = (e, targetIndex) => { e.preventDefault(); if (onDrop) onDrop(containerId, targetIndex); };
-  const handleContextMenuLocal = (e, item, index) => { e.preventDefault(); if(item && onContextMenu) onContextMenu(containerId, index); }
+  
+  const handleDropLocal = (e, targetIndex) => { 
+      e.preventDefault(); 
+      if (onDrop) onDrop(containerId, targetIndex); 
+  };
+  
+  const handleContextMenuLocal = (e, item, index) => { 
+      e.preventDefault(); 
+      if(item && onContextMenu) onContextMenu(containerId, index); 
+  };
+
+  const handleMouseEnter = (e, item) => {
+      if (!item) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      setTooltipPos({
+          x: rect.left + (rect.width / 2),
+          y: rect.top - 8 // slightly above the item
+      });
+      setHoveredItem(item);
+  };
+
+  const handleMouseLeave = () => {
+      setHoveredItem(null);
+  };
 
   const getRarityTextColor = (rarity) => {
       switch(rarity) {
@@ -191,15 +219,12 @@ export const InventoryGrid = ({ slots: inventory, mp, cash, salvage, onUseItem, 
   return (
     <div className="flex flex-col h-full">
       {containerId === 'inventory' && (
-        // Currency Pouch Header (Z-Index: 20)
-        <div className="flex justify-between items-center p-2 bg-[#131313] border border-slate-800 rounded shrink-0 mb-3 text-[10px] z-20">
-            <div className="flex items-center gap-1.5"><RenderIcon name="DollarSign" size={12} className="text-emerald-400"/><span className="font-mono font-bold text-white">${(cash || 0).toLocaleString()}</span></div>
-            <div className="flex items-center gap-1.5"><RenderIcon name="Brain" size={12} className="text-pink-400"/><span className="font-mono font-bold text-white">{(mp || 0).toLocaleString()}</span></div>
-            <div className="flex items-center gap-1.5"><RenderIcon name="Wrench" size={12} className="text-slate-400"/><span className="font-mono font-bold text-white">{salvage || 0}</span></div>
+        <div className="flex justify-between items-center p-2 bg-[#131313] border border-slate-800 rounded shrink-0 mb-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-pink-400"><RenderIcon name="Brain" size={14}/> Brain Matter Pouch</div>
+            <div className="font-mono text-white text-sm">{mp || 0} BM</div>
         </div>
       )}
 
-      {/* Grid Container (Scrollable) */}
       <div className={`grid ${containerId === 'bank' ? 'grid-cols-5' : 'grid-cols-4'} gap-2 p-2 overflow-y-auto custom-scrollbar flex-1 content-start pb-12`}>
           {safeSlots.map((item, i) => (
               <div 
@@ -210,9 +235,10 @@ export const InventoryGrid = ({ slots: inventory, mp, cash, salvage, onUseItem, 
                 onDrop={(e) => handleDropLocal(e, i)}
                 onClick={() => item && onUseItem && onUseItem(item, i, containerId)}
                 onContextMenu={(e) => handleContextMenuLocal(e, item, i)}
-                // FINAL FIX: Position tooltip BELOW the item (top: 110%) and boost z-index on the container on hover.
+                onMouseEnter={(e) => handleMouseEnter(e, item)}
+                onMouseLeave={handleMouseLeave}
                 className={`
-                    aspect-square rounded border flex items-center justify-center relative transition-all group z-50 hover:z-[100]
+                    aspect-square rounded border flex items-center justify-center relative transition-all group
                     ${item 
                         ? `cursor-grab active:cursor-grabbing hover:text-white bg-gradient-to-br ${getRarityGradient(item.rarity)} text-slate-400` 
                         : 'bg-[#1a1a1a] border-slate-800/50 border-dashed hover:border-slate-700'
@@ -227,18 +253,32 @@ export const InventoryGrid = ({ slots: inventory, mp, cash, salvage, onUseItem, 
                                 x{item.count}
                             </div>
                         )}
-                        {/* Tooltip: Positioned BELOW the item (top: 110%) to clear the currency pouch header */}
-                        <div className="absolute top-[110%] left-1/2 -translate-x-1/2 w-40 bg-[#0a0a0a] p-2 rounded border border-slate-700 text-xs shadow-2xl hidden group-hover:block z-[99999] pointer-events-none whitespace-normal">
-                            <div className={`font-bold text-[10px] mb-0.5 ${getRarityTextColor(item.rarity)}`}>{item.name}</div>
-                            <div className="text-[9px] leading-tight text-slate-300">{item.desc || item.type}</div>
-                            {/* Arrow pointing UPWARDS */}
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-[#0a0a0a] border-l border-t border-slate-700 rotate-45"></div>
-                        </div>
                     </>
                   )}
               </div>
           ))}
       </div>
+
+      {/* PORTAL TOOLTIP - USES hoveredItem correctly */}
+      {hoveredItem && createPortal(
+          <div 
+              className="fixed z-[9999] pointer-events-none w-44 bg-[#0a0a0a] p-3 rounded-lg border border-slate-600 text-xs shadow-[0_0_20px_rgba(0,0,0,0.8)] backdrop-blur-md"
+              style={{ 
+                  left: tooltipPos.x, 
+                  top: tooltipPos.y, 
+                  transform: 'translate(-50%, -100%)' 
+              }}
+          >
+              <div className={`font-bold text-sm mb-1 ${getRarityTextColor(hoveredItem.rarity)} flex justify-between`}>
+                  {hoveredItem.name}
+                  <span className="text-[9px] uppercase border border-white/20 px-1 rounded text-white/50">{hoveredItem.rarity}</span>
+              </div>
+              <div className="text-[10px] leading-relaxed text-slate-300 mb-2">{hoveredItem.desc || hoveredItem.type}</div>
+              
+              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-[5px] w-3 h-3 bg-[#0a0a0a] border-r border-b border-slate-600 rotate-45"></div>
+          </div>,
+          document.body
+      )}
     </div>
   );
 };
@@ -366,6 +406,36 @@ export const CollectionBinder = ({ cards, onSell, onSellAll }) => {
             )}
         </div>
     );
+};
+
+// --- WELLNESS BAR ---
+export const WellnessBar = ({ label, value, iconName, onFill, color, task }) => {
+  const progressPercent = Math.max(0, Math.min(100, value));
+  
+  return (
+    <div className="bg-[#131313] p-3 rounded-lg border border-slate-700 flex flex-col hover:border-blue-500/50 transition-colors">
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center gap-2">
+          <div className={`p-1 rounded-md ${color.replace('bg', 'text')}`}><RenderIcon name={iconName} size={16} /></div>
+          <h4 className="text-xs font-bold text-white">{label}</h4>
+        </div>
+        <span className="text-xs font-mono text-white">{value}%</span>
+      </div>
+      <div className="h-2 w-full bg-black rounded-full overflow-hidden border border-slate-700 relative">
+        <div className={`h-full ${color} transition-all duration-300`} style={{ width: `${progressPercent}%` }}></div>
+      </div>
+      <div className="flex justify-between items-center mt-2">
+        <span className="text-[10px] text-slate-500 italic flex items-center gap-1"><RenderIcon name="CheckCircle" size={10} className="text-emerald-500" /> Complete: {task}</span>
+        <button 
+          onClick={onFill} 
+          disabled={value >= 100}
+          className="text-[9px] font-bold px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors"
+        >
+          FILL +20
+        </button>
+      </div>
+    </div>
+  );
 };
 
 // --- UTILITY COMPONENTS (EXPORTED) ---
