@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useGameStore } from '../../store/gamestore'; 
-import { SHOP_ITEMS, CARD_DATABASE, SKILL_DETAILS, INVENTORY_SLOTS, USER_NAME, WIDGET_DATABASE } from '../../data/gamedata'; 
-import { WellnessBar, InventoryGrid, ContractWidget, CollectionBinder, SkillCard, MasteryModal, MasteryLogWidget, AssetBar, InputGroup, InputField } from './dashboardui'; 
+import { SHOP_ITEMS, CARD_DATABASE, SKILL_DETAILS, WIDGET_DATABASE } from '../../data/gamedata'; 
+import { WellnessBar, InventoryGrid, ContractWidget, MasteryModal, InputGroup, InputField } from './dashboardui'; 
 import { RenderIcon } from './dashboardutils';
 import ShopFullPage from './shopfullpage'; 
 import EstatePrototype from './estateprototype';
@@ -15,9 +15,10 @@ import InventoryView from './inventoryprototype';
 export default function VaultDashboard() {
   const { 
     data, loading, loadGame, saveGame, updateWellness, setDiscipline, 
-    updateNestedData, manualGrind, updateData, purchaseItemAction, 
+    updateNestedData, updateData, purchaseItemAction, 
     handleUseItemAction, handleSellCardAction, toggleAchievementAction, 
-    handleClaimMasteryRewardAction, pendingPackOpen, getSkillData
+    handleClaimMasteryRewardAction, pendingPackOpen, getSkillData,
+    tickFocusSession 
   } = useGameStore();
 
   useEffect(() => { loadGame(); setInterval(saveGame, 60000); }, []);
@@ -27,11 +28,42 @@ export default function VaultDashboard() {
     return () => clearInterval(timer);
   }, [loading, updateWellness]);
 
+  // --- FOCUS TIMER STATE ---
+  const [focusActive, setFocusActive] = useState(false);
+  const [focusElapsed, setFocusElapsed] = useState(0);
+
+  // Focus Timer Logic (Upward counting, 3 BM/s base, +multiplier capped at 10)
+  useEffect(() => {
+      let interval = null;
+      if (focusActive) {
+          interval = setInterval(() => {
+              setFocusElapsed(prev => {
+                  const newTime = prev + 1;
+                  // Base: 3. Multiplier: +1 every 60s. Cap: 10.
+                  const multiplier = Math.floor(newTime / 60);
+                  const rate = Math.min(10, 3 + multiplier);
+                  tickFocusSession(3, Math.min(7, multiplier)); // 3 base + multiplier (max 7) = 10 max
+                  return newTime;
+              });
+          }, 1000);
+      }
+      return () => clearInterval(interval);
+  }, [focusActive, tickFocusSession]);
+
+  const toggleFocus = () => setFocusActive(!focusActive);
+  const resetFocus = () => { setFocusActive(false); setFocusElapsed(0); };
+  const formatTime = (totalSeconds) => {
+      const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+      const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+      const s = (totalSeconds % 60).toString().padStart(2, '0');
+      return `${h}:${m}:${s}`;
+  };
+  const currentFocusRate = Math.min(10, 3 + Math.floor(focusElapsed / 60));
+
   // --- UI STATE ---
   const [activeTab, setActiveTab] = useState('dynamic'); 
   const [isTodoCollapsed, setIsTodoCollapsed] = useState(false);
   const [isRightCollapsed, setIsRightCollapsed] = useState(false);
-  const [isKanbanExpanded, setIsKanbanExpanded] = useState(false);
   const [rightPanelTab, setRightPanelTab] = useState('skills');
   const [leftPanelSubTab, setLeftPanelSubTab] = useState('tasks');
   const [leftPanelWidth, setLeftPanelWidth] = useState(288);
@@ -39,22 +71,15 @@ export default function VaultDashboard() {
   const [isResizing, setIsResizing] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [skillModal, setSkillModal] = useState(null); 
-  const [masteryLogOpen, setMasteryLogOpen] = useState(false); 
   const [toast, setToast] = useState(null);
-  const [packOpening, setPackOpening] = useState(null);
-  const [dragItem, setDragItem] = useState(null);
-
   const [vaultSubTab, setVaultSubTab] = useState('profile');
   const [analyticsSubTab, setAnalyticsSubTab] = useState('stats');
-
-  const colors = { bg: '#2b3446', border: '#404e6d', accent: '#e1b542' };
 
   // --- HANDLERS ---
   const showToast = useCallback((msg, type) => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); }, []);
   const handleSetDiscipline = (val) => setDiscipline(val);
-  const purchaseItem = (i, c) => { const r = purchaseItemAction(i, c); if(r.success && (i.type==='Pack'||i.type==='Box')) setPackOpening(null); showToast(r.message, r.success?'success':'error'); };
-  const handleUseItem = (i, idx, cId) => { const r = handleUseItemAction(i, idx, cId); if(r.success && i.type==='Pack') setPackOpening(pendingPackOpen); showToast(r.message, r.success?'success':'error'); };
-  const handleSellCard = (id, val) => { const r = handleSellCardAction(id, val); showToast(r.message, r.success?'success':'error'); };
+  const purchaseItem = (i, c) => { const r = purchaseItemAction(i, c); showToast(r.message, r.success?'success':'error'); };
+  const handleUseItem = (i, idx, cId) => { const r = handleUseItemAction(i, idx, cId); showToast(r.message, r.success?'success':'error'); };
   const toggleAchievement = (id) => { const r = toggleAchievementAction(id, !data.achievements.find(a=>a.id===id).completed); if(r.success) showToast(r.rewardMsg || 'Updated', 'success'); };
   const handleClaimMasteryReward = (sId, lvl, rwd) => { const r = handleClaimMasteryRewardAction(sId, lvl, rwd); if(r.success) { setSkillModal(null); showToast(r.message, 'success'); } else showToast(r.message, 'error'); };
   
@@ -65,40 +90,23 @@ export default function VaultDashboard() {
 
   const updateAsset = (key, value) => {
     const val = parseInt(value) || 0;
-    const oldVal = data.assets[key] || 0;
     updateNestedData(`assets.${key}`, val);
-    if (val > oldVal) updateData(prev => ({ lifetime: { ...prev.lifetime, totalAssetAcquisitionCost: prev.lifetime.totalAssetAcquisitionCost + (val - oldVal) } }));
-  };
-  const updateLiability = (key, value) => {
-    const val = parseInt(value) || 0;
-    const oldVal = data.liabilities[key] || 0;
-    updateNestedData(`liabilities.${key}`, val);
-    if (oldVal > val) updateData(prev => ({ lifetime: { ...prev.lifetime, totalDebtPrincipalPaid: prev.lifetime.totalDebtPrincipalPaid + (oldVal - val) } }));
-  };
-  const handleInfoClick = (widgetId) => {
-      const info = {
-          productivity_timer: "A Pomodoro-style timer to track deep work sessions. Initiating a session earns Brain Matter and has a chance for pack rewards.",
-          task_command_center: "Your horizontally expanded Kanban board. Add new tasks and drag them between columns (To Do, Active, Done).",
-          todo_list: "Your collapsible multi-list task manager, saving data to LocalStorage.",
-      }[widgetId] || "Information about this widget is not yet available.";
-      showToast(info, 'info');
   };
 
-  // --- MEMOIZED DATA ---
-  const financials = useMemo(() => {
-      const ta = Object.values(data.assets || {}).reduce((a,b)=>Number(a)+Number(b),0)+Number(data.cash||0);
-      const tl = Object.values(data.liabilities || {}).reduce((a,b)=>Number(a)+Number(b),0);
-      return { netWorth: ta-tl, monthlyCashFlow: data.monthlyIncome-data.monthlyExpenses };
-  }, [data]);
+  // --- MEMOIZED DATA & TRACKERS ---
   const { calculatedSkills: playerSkills, totalXPs } = useMemo(() => getSkillData(), [data, getSkillData]);
   const combatStats = useMemo(() => ({ totalLevel: playerSkills.reduce((s,x)=>s+x.level,0), combatLevel: Math.floor(playerSkills.reduce((s,x)=>s+x.level,0)/4) }), [playerSkills]);
+  
+  // Calculate $/Sec based on Monthly Net Income
+  const monthlyNetIncome = (data.monthlyIncome || 0) - (data.monthlyExpenses || 0);
+  const dollarsPerSecond = (monthlyNetIncome / 2629746).toFixed(4); 
 
   // --- RESIZING/DRAG LOGIC ---
   useEffect(() => {
     const handleMouseMove = (e) => {
         if (!isResizing) return;
-        if (isResizing === 'left') setLeftPanelWidth(Math.max(200, Math.min(450, e.clientX)));
-        else if (isResizing === 'right') setRightPanelWidth(Math.max(200, Math.min(450, window.innerWidth - e.clientX)));
+        if (isResizing === 'left') setLeftPanelWidth(Math.max(60, Math.min(450, e.clientX))); 
+        else if (isResizing === 'right') setRightPanelWidth(Math.max(60, Math.min(450, window.innerWidth - e.clientX)));
     };
     const handleMouseUp = () => setIsResizing(false);
     if (isResizing) { window.addEventListener('mousemove', handleMouseMove); window.addEventListener('mouseup', handleMouseUp); }
@@ -144,7 +152,6 @@ export default function VaultDashboard() {
   };
 
   if (loading) return <div className="min-h-screen bg-[#2b3446] flex items-center justify-center text-white">Loading...</div>;
-  if (isKanbanExpanded) return <div className="fixed inset-0 z-50 bg-[#0f1219] p-6 flex flex-col">{/* Kanban Modal Content */}</div>;
 
   const renderWidget = (widgetId, location) => {
     const isVisible = data.widgetConfig?.[widgetId];
@@ -158,8 +165,6 @@ export default function VaultDashboard() {
             draggable={editMode}
             onDragStart={(e) => handleDragStart(e, widgetId)}
         >
-            <button onClick={(e) => { e.stopPropagation(); handleInfoClick(widgetId); }} className="absolute top-2 left-2 p-1 bg-black/50 rounded z-20 text-white hover:bg-black" title="Widget Information"><RenderIcon name="HelpCircle" size={12} /></button>
-            
             {editMode && (
                 <div className="absolute top-2 right-2 flex gap-1 z-20">
                     {location === 'center' && (
@@ -185,7 +190,6 @@ export default function VaultDashboard() {
   const renderWidgetDatabase = () => (
       <div className="space-y-4 p-4">
           <div className="text-xs font-bold text-amber-400 uppercase">Draggable Widgets</div>
-          <p className="text-[10px] text-slate-400 mb-4">Drag these elements onto the center grid to add them to your layout.</p>
           <div className="grid grid-cols-2 gap-3">
               {WIDGET_DATABASE.map(item => (
                   <div 
@@ -193,11 +197,9 @@ export default function VaultDashboard() {
                       draggable={true}
                       onDragStart={(e) => handleDragStart(e, item.id)}
                       className="p-3 bg-slate-800 rounded-lg border border-slate-700 cursor-grab flex flex-col items-center text-center hover:border-amber-500 transition-colors"
-                      title={`Drag ${item.name}`}
                   >
                       <RenderIcon name={item.icon} size={18} className="text-amber-500 mb-1"/>
                       <span className="text-[10px] font-bold text-white leading-none">{item.name}</span>
-                      <span className="text-[9px] text-slate-500 mt-1">{item.category}</span>
                   </div>
               ))}
           </div>
@@ -206,24 +208,57 @@ export default function VaultDashboard() {
 
   return (
     <div className="min-h-screen text-slate-200 font-sans bg-vault-dark flex flex-col">
-      {toast && <div className="fixed top-20 right-4 z-50 bg-[#232a3a] border border-amber-500 text-white px-4 py-3 rounded shadow-xl"><RenderIcon name="Zap" size={16} className="text-amber-500" /> <span className="text-sm font-bold">{toast.msg}</span></div>}
+      {toast && <div className="fixed top-20 right-4 z-[200] bg-[#232a3a] border border-amber-500 text-white px-4 py-3 rounded shadow-xl"><RenderIcon name="Zap" size={16} className="text-amber-500" /> <span className="text-sm font-bold">{toast.msg}</span></div>}
       
       {skillModal && <MasteryModal skill={skillModal} onClose={() => setSkillModal(null)} onClaimReward={handleClaimMasteryReward} claimedLevels={data.lifetime.claimedMasteryRewards[skillModal.id] || []}/>}
 
       {/* HEADER */}
-      <div className="sticky top-0 z-40 bg-[#2b3446] border-b border-[#404e6d] shadow-xl">
+      <div className="sticky top-0 z-[60] bg-[#2b3446] border-b border-[#404e6d] shadow-xl">
           
           {/* Row 1: Title, Currency, Tabs */}
-          <header className="w-full max-w-6xl mx-auto p-4 flex justify-between items-center">
+          <header className="w-full max-w-7xl mx-auto p-3 flex justify-between items-center">
              <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('dynamic')}>
                 <RenderIcon name="Shield" size={28} className="text-amber-500" />
                 <div>
                     <div className="font-bold text-white leading-none">THE VAULT</div>
                     <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono mt-1">
                         <span className="flex items-center gap-1 text-emerald-400 font-bold bg-black/30 px-2 py-0.5 rounded"><RenderIcon name="DollarSign" size={10} /> {data.cash.toLocaleString()}</span>
-                        <span className="flex items-center gap-1 text-pink-400 font-bold bg-black/30 px-2 py-0.5 rounded"><RenderIcon name="Brain" size={10} /> {data.discipline.toLocaleString()} BM</span>
+                        {/* ENHANCED BRAIN MATTER GRAPHIC IN HEADER */}
+                        <span className="flex items-center gap-1 text-pink-400 font-bold bg-black/30 px-2 py-0.5 rounded">
+                            <div className="p-0.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 shadow-lg shadow-pink-900/50">
+                                <RenderIcon name="Brain" size={10} className="text-white"/>
+                            </div>
+                            {data.discipline.toLocaleString()}
+                        </span>
+                        <span className="flex items-center gap-1 text-slate-300 font-bold bg-black/30 px-2 py-0.5 rounded"><RenderIcon name="Wrench" size={10} /> {data.salvage || 0}</span>
                     </div>
                 </div>
+             </div>
+
+             {/* RATE TRACKERS (Money/Sec & BM/Sec) */}
+             <div className="hidden md:flex items-center gap-6 text-xs bg-black/20 px-4 py-2 rounded-lg border border-slate-700/50">
+                 <div className="flex flex-col items-center">
+                     <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Passive Inc</span>
+                     <span className="font-mono text-emerald-400 font-bold">${dollarsPerSecond}/s</span>
+                 </div>
+                 <div className="flex flex-col items-center">
+                     <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Active Focus</span>
+                     <span className="font-mono text-pink-400 font-bold">+{currentFocusRate} BM/s</span>
+                 </div>
+             </div>
+
+             {/* FOCUS TIMER */}
+             <div className="flex items-center bg-black/40 rounded-lg border border-slate-700 p-1 gap-4 px-4">
+                 <div className="flex flex-col items-start">
+                     <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Focus Link</span>
+                     <span className={`font-mono font-bold text-lg leading-none ${focusActive ? 'text-emerald-400' : 'text-slate-500'}`}>{formatTime(focusElapsed)}</span>
+                 </div>
+                 <div className="flex gap-1">
+                     <button onClick={toggleFocus} className={`p-2 rounded ${focusActive ? 'bg-yellow-600 hover:bg-yellow-500 text-black' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}>
+                         <RenderIcon name={focusActive ? "Pause" : "Play"} size={16} fill="currentColor"/>
+                     </button>
+                     <button onClick={resetFocus} className="p-2 rounded bg-slate-700 hover:bg-slate-600 text-slate-300"><RenderIcon name="RotateCcw" size={16}/></button>
+                 </div>
              </div>
 
              <nav className="flex p-1 rounded-lg bg-[#232a3a] border border-[#404e6d]">
@@ -233,7 +268,7 @@ export default function VaultDashboard() {
              </nav>
           </header>
 
-          {/* Row 2: Vitals Monitor (Centered) */}
+          {/* Row 2: Vitals Monitor */}
           <div className="w-full bg-[#131313] border-t border-[#404e6d] py-2">
               <div className="w-full max-w-6xl mx-auto flex justify-center px-4">
                   <div className="flex items-center space-x-4">
@@ -241,10 +276,10 @@ export default function VaultDashboard() {
                        .map(v => (
                            <div key={v.k} className="flex items-center space-x-2">
                                <RenderIcon name={v.i} size={16} className={v.c} />
-                               <span className="text-sm font-mono text-white font-bold">{data.wellness[v.k]}%</span>
+                               <span className="text-sm font-mono text-white font-bold">{Math.floor(data.wellness[v.k])}%</span>
                                <button 
                                  onClick={() => handleMaintainVital(v.k)} 
-                                 className="bg-slate-700 hover:bg-slate-600 rounded px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-slate-600 transition"
+                                 className="bg-slate-700 hover:bg-slate-600 rounded px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-slate-600 transition hover:scale-105"
                                >
                                  +20
                                </button>
@@ -259,37 +294,74 @@ export default function VaultDashboard() {
       <main className="flex-1 overflow-hidden relative">
         {/* --- HOME TAB --- */}
         {activeTab === 'dynamic' && (
-            <div className="flex h-[calc(100vh-80px)] overflow-hidden">
-                {/* 1. LEFT: COLLAPSIBLE TODO/WIDGET DB */}
-                <div className={`transition-colors duration-100 border-r border-slate-700 bg-[#161b22] relative flex flex-col shrink-0 ${isTodoCollapsed ? 'w-12' : ''}`} style={{ width: isTodoCollapsed ? '3rem' : `${leftPanelWidth}px` }}>
-                    <div className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-slate-600/50 z-20" onMouseDown={(e)=>{e.preventDefault(); setIsResizing('left')}}/>
-                    <button onClick={() => setIsTodoCollapsed(!isTodoCollapsed)} className="absolute -right-3 top-4 bg-slate-700 text-white p-1 rounded-full z-10 border border-slate-500"><RenderIcon name={isTodoCollapsed ? "ChevronRight" : "ChevronLeft"} size={12}/></button>
+            <div className="flex h-[calc(100vh-100px)] overflow-hidden">
+                
+                {/* 1. LEFT: COLLAPSIBLE PANEL */}
+                <div 
+                    className={`transition-all duration-200 border-r border-slate-700 bg-[#161b22] relative flex flex-col shrink-0 z-[70] ${isTodoCollapsed ? 'w-14 items-center py-4' : ''}`} 
+                    style={{ width: isTodoCollapsed ? '3.5rem' : `${leftPanelWidth}px` }}
+                >
+                    {!isTodoCollapsed && <div className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-slate-600/50 z-20" onMouseDown={(e)=>{e.preventDefault(); setIsResizing('left')}}/>}
                     
-                    {/* Collapsed Icons */}
+                    {/* Collapsed State: Vertical Stack of Buttons (Aligned) */}
                     {isTodoCollapsed ? (
-                        <div className="pt-4 flex flex-col items-center gap-4">
-                            <button onClick={() => { setIsTodoCollapsed(false); setLeftPanelSubTab('tasks'); }} className="group relative p-2 rounded hover:bg-slate-700/50">
-                                <RenderIcon name="List" size={24} className="text-slate-500"/>
-                                <span className="absolute left-12 top-2 z-50 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Tasks</span>
+                        <div className="flex flex-col gap-4 items-center w-full">
+                            {/* Expander */}
+                            <button 
+                                onClick={() => setIsTodoCollapsed(false)} 
+                                className="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded-lg border border-slate-500 shadow-md transition-colors"
+                                title="Expand Panel"
+                            >
+                                <RenderIcon name="ChevronRight" size={16}/>
                             </button>
-                            <button onClick={() => { setIsTodoCollapsed(false); setLeftPanelSubTab('widgets'); }} className="group relative p-2 rounded hover:bg-slate-700/50">
-                                <RenderIcon name="Grid" size={24} className="text-amber-500"/>
-                                <span className="absolute left-12 top-2 z-50 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Widgets</span>
+                            
+                            <div className="w-8 h-px bg-slate-700"></div>
+
+                            {/* Icons for Tabs */}
+                            <button onClick={() => { setIsTodoCollapsed(false); setLeftPanelSubTab('tasks'); }} className="group relative p-2 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors">
+                                <RenderIcon name="List" size={20}/>
+                                <span className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2 py-1 bg-black border border-slate-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[80] pointer-events-none shadow-xl">Tasks</span>
+                            </button>
+                            
+                            <button onClick={() => { setIsTodoCollapsed(false); setLeftPanelSubTab('widgets'); }} className="group relative p-2 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors">
+                                <RenderIcon name="Grid" size={20}/>
+                                <span className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2 py-1 bg-black border border-slate-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[80] pointer-events-none shadow-xl">Widget DB</span>
                             </button>
                         </div>
                     ) : (
                         // Expanded View
-                        <div className={`flex-1 overflow-y-auto flex flex-col`}>
-                            <div className="flex justify-around p-4 border-b border-slate-700">
-                                <button onClick={() => setLeftPanelSubTab('tasks')} className={`flex-1 py-1 text-xs font-bold rounded ${leftPanelSubTab === 'tasks' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Tasks</button>
-                                <button onClick={() => setLeftPanelSubTab('widgets')} className={`flex-1 py-1 text-xs font-bold rounded ${leftPanelSubTab === 'widgets' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Widget DB</button>
+                        <div className={`flex-1 overflow-hidden flex flex-col w-full`}>
+                            {/* Expanded Header with Retract Button Inside */}
+                            <div className="flex items-center justify-between p-3 border-b border-slate-700 bg-[#131313]">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Sidebar</span>
+                                <button 
+                                    onClick={() => setIsTodoCollapsed(true)} 
+                                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded border border-slate-600 transition-colors"
+                                    title="Collapse Panel"
+                                >
+                                    <RenderIcon name="ChevronLeft" size={14}/>
+                                </button>
                             </div>
-                            <div className="flex-1 overflow-y-auto custom-scrollbar">
+
+                            <div className="flex justify-around p-2 border-b border-slate-700 bg-[#161b22]">
+                                <button onClick={() => setLeftPanelSubTab('tasks')} className={`flex-1 py-1.5 text-xs font-bold rounded transition-colors ${leftPanelSubTab === 'tasks' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Tasks</button>
+                                <button onClick={() => setLeftPanelSubTab('widgets')} className={`flex-1 py-1.5 text-xs font-bold rounded transition-colors ${leftPanelSubTab === 'widgets' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}>Widget DB</button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
                                 {leftPanelSubTab === 'tasks' ? (
-                                    <div className="p-4">{data.layout.home.left_sidebar.map(w => <div key={w} className="h-full">{renderWidget(w, 'left')}</div>)}</div>
+                                    <div className="p-4 h-full flex flex-col gap-4">
+                                        {data.layout.home.left_sidebar.map(w => <div key={w} className="h-full">{renderWidget(w, 'left')}</div>)}
+                                    </div>
                                 ) : (
                                     renderWidgetDatabase()
                                 )}
+                            </div>
+                            
+                            <div className="p-4 border-t border-slate-700 bg-[#131313]">
+                                <button onClick={() => setEditMode(!editMode)} className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded text-xs font-bold border transition-colors ${editMode ? 'bg-amber-500 text-black border-amber-600' : 'bg-slate-800 text-slate-300 border-slate-600 hover:bg-slate-700'}`}>
+                                    <RenderIcon name="Edit3" size={14}/> {editMode ? 'FINISH EDITING' : 'EDIT DASHBOARD LAYOUT'}
+                                </button>
                             </div>
                         </div>
                     )}
@@ -297,33 +369,65 @@ export default function VaultDashboard() {
 
                 {/* 2. CENTER: GRID */}
                 <div className="flex-1 overflow-y-auto p-6 bg-[#0f1219]">
-                    <div className="flex justify-end mb-4"><button onClick={() => setEditMode(!editMode)} className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold border ${editMode ? 'bg-amber-500 text-black' : 'bg-transparent text-slate-400'}`}><RenderIcon name="Edit3" size={14}/> {editMode ? 'DONE' : 'EDIT LAYOUT'}</button></div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
-                        {data.layout.home.center.map((w, i) => <div key={i} onDragOver={(e)=>e.preventDefault()} onDrop={(e)=>handleDrop(e, 'center', i)}>{renderWidget(w, 'center')}</div>)}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto pb-10">
+                        {data.layout.home.center.map((w, i) => (
+                            <div key={i} onDragOver={(e)=>e.preventDefault()} onDrop={(e)=>handleDrop(e, 'center', i)}>
+                                {renderWidget(w, 'center')}
+                            </div>
+                        ))}
                     </div>
                 </div>
 
-                {/* 3. RIGHT: COLLAPSIBLE & RESIZABLE PANEL */}
-                <div className={`bg-[#1a1a1a] border-l border-slate-700 flex flex-col shrink-0 relative transition-all duration-100 z-50 ${isRightCollapsed ? 'w-12' : ''}`} style={{ width: isRightCollapsed ? '3rem' : `${rightPanelWidth}px` }}>
-                    <div className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-slate-600/50 z-20" onMouseDown={(e)=>{e.preventDefault(); setIsResizing('right')}}/>
-                    <button onClick={() => setIsRightCollapsed(!isRightCollapsed)} className="absolute -left-3 top-4 bg-slate-700 text-white p-1 rounded-full z-50 border border-slate-500"><RenderIcon name={isRightCollapsed ? "ChevronLeft" : "ChevronRight"} size={12}/></button>
+                {/* 3. RIGHT: COLLAPSIBLE PANEL */}
+                <div 
+                    className={`transition-all duration-200 border-l border-slate-700 bg-[#1a1a1a] flex flex-col shrink-0 relative z-[70] ${isRightCollapsed ? 'w-14 items-center py-4' : ''}`} 
+                    style={{ width: isRightCollapsed ? '3.5rem' : `${rightPanelWidth}px` }}
+                >
+                    {!isRightCollapsed && <div className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-slate-600/50 z-20" onMouseDown={(e)=>{e.preventDefault(); setIsResizing('right')}}/>}
                     
-                    {/* Collapsed Icons */}
+                    {/* Collapsed State: Vertical Stack */}
                     {isRightCollapsed ? (
-                        <div className="pt-4 flex flex-col items-center gap-4">
-                            <button onClick={() => { setIsRightCollapsed(false); setRightPanelTab('skills'); }} className="group relative p-2 rounded hover:bg-slate-700/50">
-                                <RenderIcon name="Scroll" size={24} className="text-amber-500"/>
-                                <span className="absolute right-12 top-2 z-50 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Skills</span>
+                        <div className="flex flex-col gap-4 items-center w-full">
+                            {/* Expander */}
+                            <button 
+                                onClick={() => setIsRightCollapsed(false)} 
+                                className="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded-lg border border-slate-500 shadow-md transition-colors"
+                                title="Expand Panel"
+                            >
+                                <RenderIcon name="ChevronLeft" size={16}/>
                             </button>
-                            <button onClick={() => { setIsRightCollapsed(false); setRightPanelTab('inventory'); }} className="group relative p-2 rounded hover:bg-slate-700/50">
-                                <RenderIcon name="Package" size={24} className="text-emerald-500"/>
-                                <span className="absolute right-12 top-2 z-50 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Inventory</span>
+
+                            <div className="w-8 h-px bg-slate-700"></div>
+
+                            <button onClick={() => { setIsRightCollapsed(false); setRightPanelTab('skills'); }} className="group relative p-2 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors">
+                                <RenderIcon name="Scroll" size={20}/>
+                                <span className="absolute right-full top-1/2 -translate-y-1/2 mr-3 px-2 py-1 bg-black border border-slate-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[80] pointer-events-none shadow-xl">Skills</span>
+                            </button>
+                            <button onClick={() => { setIsRightCollapsed(false); setRightPanelTab('inventory'); }} className="group relative p-2 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors">
+                                <RenderIcon name="Package" size={20}/>
+                                <span className="absolute right-full top-1/2 -translate-y-1/2 mr-3 px-2 py-1 bg-black border border-slate-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[80] pointer-events-none shadow-xl">Inventory</span>
                             </button>
                         </div>
                     ) : (
                         // Expanded Content
-                        <div className={`flex-1 flex flex-col overflow-hidden opacity-100`}>
-                            <div className="p-2 border-b border-slate-800 bg-[#131313] flex justify-center sticky top-0 z-10 gap-1">{['skills', 'inventory'].map(t => <button key={t} onClick={() => setRightPanelTab(t)} className={`flex-1 py-2 text-xs font-bold uppercase rounded ${rightPanelTab===t ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white'}`}>{t}</button>)}</div>
+                        <div className={`flex-1 flex flex-col overflow-hidden opacity-100 w-full`}>
+                            {/* Expanded Header */}
+                            <div className="flex items-center justify-between p-3 border-b border-slate-800 bg-[#131313]">
+                                <button 
+                                    onClick={() => setIsRightCollapsed(true)} 
+                                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-1.5 rounded border border-slate-600 transition-colors"
+                                    title="Collapse Panel"
+                                >
+                                    <RenderIcon name="ChevronRight" size={14}/>
+                                </button>
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Resources</span>
+                            </div>
+
+                            <div className="p-2 border-b border-slate-800 bg-[#131313] flex justify-center gap-1">
+                                {['skills', 'inventory'].map(t => (
+                                    <button key={t} onClick={() => setRightPanelTab(t)} className={`flex-1 py-1.5 text-xs font-bold uppercase rounded transition-colors ${rightPanelTab===t ? 'bg-amber-500 text-black' : 'text-slate-500 hover:text-white'}`}>{t}</button>
+                                ))}
+                            </div>
                             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
                                 {rightPanelTab === 'skills' && playerSkills.map(skill => (<div key={skill.id} onClick={() => setSkillModal({ ...SKILL_DETAILS[skill.id], ...skill, currentXP: totalXPs[skill.id] })} className="flex justify-between items-center text-xs p-2 bg-black/40 rounded border border-slate-800 cursor-pointer hover:bg-slate-700"><div className="flex items-center gap-2 text-slate-300"><RenderIcon name={skill.iconName} size={14} className={skill.color}/> {skill.name}</div><div className="font-mono">Lvl {skill.level}</div></div>))}
                                 {rightPanelTab === 'inventory' && <InventoryGrid slots={data.inventory} mp={data.discipline} onUseItem={handleUseItem} containerId="inventory" />}
@@ -366,7 +470,7 @@ export default function VaultDashboard() {
             </div>
         )}
 
-        {activeTab === 'shop' && <ShopFullPage onPurchase={purchaseItem} discipline={data.discipline} />}
+        {activeTab === 'shop' && <ShopFullPage onPurchase={purchaseItem} discipline={data.discipline} inventory={data.inventory} />}
       </main>
     </div>
   );
