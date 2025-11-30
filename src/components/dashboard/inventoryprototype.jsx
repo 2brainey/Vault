@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Package, BookOpen, Landmark, DollarSign, ArrowUpFromLine, ArrowDownToLine } from 'lucide-react';
-import { InventoryGrid, CollectionBinder } from './dashboardui.jsx'; 
+import { InventoryGrid, CollectionBinder } from './dashboardui'; 
 import { RenderIcon } from './dashboardutils'; 
 import { INVENTORY_SLOTS, CARD_DATABASE } from '../../data/gamedata'; 
 

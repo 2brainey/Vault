@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { db } from '../config/firebase'; 
+import { db } from '../config/firebase'; // Reverted: Removed .js
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { 
     initialData, 
@@ -8,7 +8,7 @@ import {
     CARD_DATABASE,
     SKILL_DETAILS,
     MAX_SKILL_LEVEL 
-} from '../data/gamedata';
+} from '../data/gamedata'; // Reverted: Removed .js
 
 // --- HELPER FUNCTIONS ---
 
@@ -350,7 +350,7 @@ export const useGameStore = create((set, get) => ({
     
     // Liquidity (liq): Income + Cash Flow + Cash
     const currentCashFlowValue = (data.monthlyIncome || 0) - (data.monthlyExpenses || 0);
-    const liqXP = getXP((data.lifetime.totalIncomeBase * 2) + (currentCashFlowValue * 50) + (data.cash || 0), 'liq', data);
+    const liqXP = getXP((data.lifetime.totalIncomeBase * 2) + (currentCashFlowValue * 50) + (data.assets?.cash || 0), 'liq', data);
     
     // Equity (equ): Assets + Investments + Real Estate + Debt Repayment
     const equXP = getXP(data.lifetime.totalAssetAcquisitionCost + (data.lifetime.totalDebtPrincipalPaid * 2) + (data.assets?.realEstate || 0) + (data.assets?.stocks || 0) + (data.assets?.crypto || 0), 'equ', data);
