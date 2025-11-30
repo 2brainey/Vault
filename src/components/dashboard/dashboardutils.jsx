@@ -3,12 +3,14 @@ import {
   Circle, AlertTriangle, User, Trophy, Zap, Star, Code, Cpu, Hammer, Pickaxe, 
   Sprout, Sparkles, Briefcase, X, Sword, Heart, Target, Users, LayoutDashboard, 
   ArrowRight, ArrowLeft, Flame, Edit3, Eye, EyeOff, Save, HelpCircle, Grid, List, 
-  BookOpen, ChevronRight, Lock as LockIcon, Unlock, Droplet, Brain, Smile, Package, 
+  BookOpen, ChevronRight, ChevronLeft, Lock as LockIcon, Unlock, Droplet, Brain, Smile, Package, 
   Coffee, Smartphone, Monitor, CreditCard, Map, Scroll, FileKey, Dumbbell, Camera, 
   PenTool, Car, ShoppingBag, Plus, Headphones, Armchair, Book, HardDrive, Glasses, 
   Coins, Tag, Box, Dna, Hexagon, Server, Globe, Wifi, Database, Key, MousePointer, 
   GripVertical, Settings, Sliders, Crown, Gift, Building, Landmark, Gavel, Filter, 
-  Watch, Mic, Library, Archive, Trash2, Utensils, Bed, Bath, Wrench, Play, Pause
+  Watch, Mic, Library, Archive, Trash2, Utensils, Bed, Bath, Wrench, Play, Pause,
+  Maximize, RotateCcw, PanelRightOpen, PanelRightClose, Crosshair, RefreshCw, Construction,
+  Menu // Added Menu just in case
 } from 'lucide-react';
 import React from 'react';
 
@@ -17,13 +19,14 @@ export const IconMap = {
   Shield, TrendingUp, DollarSign, Lock, Activity, Home, Layers, CheckCircle, Circle, 
   AlertTriangle, User, Trophy, Zap, Star, Code, Cpu, Hammer, Pickaxe, Sprout, Sparkles, 
   Briefcase, X, Sword, Heart, Target, Users, LayoutDashboard, ArrowRight, ArrowLeft, 
-  Flame, Edit3, Eye, EyeOff, Save, HelpCircle, Grid, List, BookOpen, ChevronRight, 
+  Flame, Edit3, Eye, EyeOff, Save, HelpCircle, Grid, List, BookOpen, ChevronRight, ChevronLeft,
   LockIcon, Unlock, Droplet, Brain, Smile, Package, Coffee, Smartphone, Monitor, 
   CreditCard, Map, Scroll, FileKey, Dumbbell, Camera, PenTool, Car, ShoppingBag, 
   Plus, Headphones, Armchair, Book, HardDrive, Glasses, Coins, Tag, Box, Dna, 
   Hexagon, Server, Globe, Wifi, Database, Key, MousePointer, GripVertical, Settings, 
   Sliders, Crown, Gift, Building, Landmark, Gavel, Filter, Watch, Mic, Library, 
-  Archive, Trash2, Utensils, Bed, Bath, Wrench, Play, Pause
+  Archive, Trash2, Utensils, Bed, Bath, Wrench, Play, Pause, Maximize, RotateCcw,
+  PanelRightOpen, PanelRightClose, Crosshair, RefreshCw, Construction, Menu
 };
 
 export const RenderIcon = ({ name, size = 16, className = "" }) => {
@@ -31,9 +34,7 @@ export const RenderIcon = ({ name, size = 16, className = "" }) => {
   return <IconComponent size={size} className={className} />;
 };
 
-// New Utility: XP calculation based on formula
 export const getXpRequiredForLevel = (level) => {
-    // XP = 100 * (10^(Level / 25) - 1)
     return Math.floor(100 * (Math.pow(10, level / 25) - 1));
 };
 

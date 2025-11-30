@@ -18,11 +18,11 @@ const BankInterface = ({ slots, balance, onDragStart, onDrop, onContextMenu, onC
     </div>
 );
 
-export default function InventoryView({ inventory, bank, bankBalance, cards, discipline, onUpdateInventory, onUpdateBank, onUpdateBankBalance, onUpdateCards, onUpdateDiscipline, onUseItem }) {
+export default function InventoryView({ inventory, bank, bankBalance, cards, discipline, cash, salvage, onUpdateInventory, onUpdateBank, onUpdateBankBalance, onUpdateCards, onUpdateDiscipline, onUseItem }) {
   const [rightTab, setRightTab] = useState('binder'); 
   const [sellConfirm, setSellConfirm] = useState(null); 
   const [draggedItem, setDraggedItem] = useState(null); 
-  const [sortMethod, setSortMethod] = useState('rarity'); // NEW: Sort State
+  const [sortMethod, setSortMethod] = useState('rarity'); 
 
   const safeInventory = Array.isArray(inventory) ? inventory : new Array(INVENTORY_SLOTS).fill(null);
   const safeBank = Array.isArray(bank) ? bank : new Array(50).fill(null);
@@ -92,7 +92,6 @@ export default function InventoryView({ inventory, bank, bankBalance, cards, dis
     <div className="h-full flex flex-col lg:flex-row gap-6 items-start">
       {sellConfirm && <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm"><div className="bg-[#1e1e1e] p-6 rounded-xl text-center"><h3 className="text-xl font-bold text-white mb-2">Sell Duplicates?</h3><p className="text-slate-400 text-sm mb-4">Gain {sellConfirm.value} DSC</p><div className="flex gap-3 justify-center"><button onClick={() => setSellConfirm(null)} className="px-4 py-2 rounded bg-slate-700">Cancel</button><button onClick={() => { onUpdateCards(safeCards.filter(id => !safeCards.filter((x,i,a) => a.indexOf(x)!==i).includes(id))); onUpdateDiscipline(discipline + sellConfirm.value); setSellConfirm(null); }} className="px-4 py-2 rounded bg-emerald-600 text-white">Confirm</button></div></div></div>}
 
-      {/* LEFT: INVENTORY */}
       <div className="lg:w-1/3 flex flex-col gap-6 h-full overflow-hidden">
         <div className="bg-[#1e1e1e] border border-slate-700 rounded-xl p-6 flex-1 flex flex-col shadow-2xl relative overflow-hidden group">
             <div className="flex justify-between items-center mb-4 relative z-10 shrink-0">
@@ -102,11 +101,10 @@ export default function InventoryView({ inventory, bank, bankBalance, cards, dis
                     <button onClick={sortInventory} className="bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded text-xs font-bold">Sort</button>
                 </div>
             </div>
-            <div className="flex-1 relative z-10 overflow-hidden"><InventoryGrid slots={safeInventory} containerId="inventory" mp={discipline} onUseItem={onUseItem} onDragStart={handleDragStart} onDrop={handleDrop} onContextMenu={handleContextMenu}/></div>
+            <div className="flex-1 relative z-10 overflow-hidden"><InventoryGrid slots={safeInventory} containerId="inventory" mp={discipline} cash={cash} salvage={salvage} onUseItem={onUseItem} onDragStart={handleDragStart} onDrop={handleDrop} onContextMenu={handleContextMenu}/></div>
         </div>
       </div>
 
-      {/* RIGHT: BINDER / BANK */}
       <div className="lg:w-2/3 bg-[#1e1e1e] border border-slate-700 rounded-xl flex flex-col shadow-2xl relative overflow-hidden h-full">
         <div className="flex border-b border-slate-700 bg-[#131313] shrink-0">
             <button onClick={() => setRightTab('binder')} className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${rightTab === 'binder' ? 'bg-[#1e1e1e] text-white border-t-2 border-amber-500' : 'text-slate-500 hover:text-slate-300 hover:bg-[#1a1a1a]'}`}><RenderIcon name="BookOpen" size={16}/> Card Binder</button>
