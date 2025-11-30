@@ -18,11 +18,11 @@ import {
 } from 'lucide-react';
 
 export const USER_NAME = "Justin";
-export const CURRENT_VERSION = "v32.0"; 
+export const CURRENT_VERSION = "v33.0"; 
 export const INVENTORY_SLOTS = 28;
 export const BANK_SLOTS = 50;
 export const MAX_SKILL_LEVEL = 99;
-export const TOTAL_SKILLS = 13; 
+export const TOTAL_SKILLS = 8; // Updated to 8
 export const MAX_TOTAL_LEVEL = MAX_SKILL_LEVEL * TOTAL_SKILLS;
 export const CONTRACTS_PER_PAGE = 5;
 export const CARDS_PER_PAGE = 8;
@@ -51,21 +51,16 @@ export const CONSTANTS = {
   }
 };
 
-// --- STATIC DATA: SKILL DETAILS ---
+// --- STATIC DATA: SKILL DETAILS (UPDATED OCTAGON MODEL) ---
 export const SKILL_DETAILS = {
-  inc: { name: "Income", icon: "Sword", color: "text-emerald-400", desc: "Raw earning power.", unlocks: [] },
-  cod: { name: "Code", icon: "Code", color: "text-blue-400", desc: "Software proficiency.", unlocks: [] },
-  cnt: { name: "Content", icon: "Target", color: "text-pink-400", desc: "Audience reach.", unlocks: [] },
-  ai: { name: "AI Ops", icon: "Sparkles", color: "text-purple-400", desc: "AI leverage.", unlocks: [] },
-  sec: { name: "Security", icon: "Shield", color: "text-slate-300", desc: "Asset protection.", unlocks: [] },
-  vit: { name: "Vitality", icon: "Heart", color: "text-red-400", desc: "Physical health.", unlocks: [] },
-  wis: { name: "Wisdom", icon: "Star", color: "text-indigo-400", desc: "Knowledge.", unlocks: [] },
-  net: { name: "Network", icon: "Users", color: "text-cyan-400", desc: "Social capital.", unlocks: [] },
-  ast: { name: "Assets", icon: "Pickaxe", color: "text-yellow-500", desc: "Hard assets.", unlocks: [] },
-  flo: { name: "Cash Flow", icon: "Activity", color: "text-green-500", desc: "Liquidity.", unlocks: [] },
-  inv: { name: "Invest", icon: "Sprout", color: "text-lime-400", desc: "ROI.", unlocks: [] },
-  est: { name: "Estate", icon: "Hammer", color: "text-orange-400", desc: "Real estate.", unlocks: [] },
-  dis: { name: "Discipline", icon: "Flame", color: "text-amber-500", desc: "Willpower.", unlocks: [] },
+  eng: { name: "Engineering", icon: "Code", color: "text-blue-400", desc: "Build & automate systems.", unlocks: [] },
+  inf: { name: "Influence", icon: "Target", color: "text-pink-400", desc: "Reach & persuasion.", unlocks: [] },
+  liq: { name: "Liquidity", icon: "DollarSign", color: "text-emerald-400", desc: "Cash flow & income.", unlocks: [] },
+  equ: { name: "Equity", icon: "Pickaxe", color: "text-yellow-500", desc: "Assets & ownership.", unlocks: [] },
+  vit: { name: "Vitality", icon: "Heart", color: "text-red-400", desc: "Health & energy.", unlocks: [] },
+  int: { name: "Intellect", icon: "Brain", color: "text-indigo-400", desc: "Wisdom & strategy.", unlocks: [] },
+  sec: { name: "Security", icon: "Shield", color: "text-slate-300", desc: "Defense & stability.", unlocks: [] },
+  wil: { name: "Willpower", icon: "Flame", color: "text-amber-500", desc: "Discipline & focus.", unlocks: [] },
 };
 
 // --- STATIC DATA: CARD DATABASE ---
@@ -92,22 +87,22 @@ export const CARD_DATABASE = [
   { id: 'l1', name: "The Singularity", rarity: "Legendary", desc: "Intelligence explosion.", iconName: "Dna", value: 5000 },
 ];
 
-// --- STATIC DATA: SHOP ITEMS ---
+// --- STATIC DATA: SHOP ITEMS (UPDATED REFERENCES) ---
 export const SHOP_ITEMS = {
   boosters: [
-    { id: 'b1', name: "Coding Bootcamp", cost: 500, effect: "+5,000 Code XP", iconName: "Code", skillId: 'cod', xpAmount: 5000, color: "text-blue-400", rarity: "Rare", type: "Booster" },
-    { id: 'b2', name: "Investment Seminar", cost: 300, effect: "+3,000 Invest XP", iconName: "TrendingUp", skillId: 'inv', xpAmount: 3000, color: "text-emerald-400", rarity: "Uncommon", type: "Booster" },
-    { id: 'b3', name: "Networking Ticket", cost: 200, effect: "+2,000 Network XP", iconName: "Users", skillId: 'net', xpAmount: 2000, color: "text-purple-400", rarity: "Uncommon", type: "Booster" },
-    { id: 'b4', name: "AI Symposium", cost: 600, effect: "+6,000 AI XP", iconName: "Sparkles", skillId: 'ai', xpAmount: 6000, color: "text-pink-400", rarity: "Epic", type: "Booster" },
-    { id: 'b5', name: "Real Estate Course", cost: 1000, effect: "+10,000 Estate XP", iconName: "Hammer", skillId: 'est', xpAmount: 10000, color: "text-amber-600", rarity: "Legendary", type: "Booster" },
-    { id: 'b6', name: "Sales Masterclass", cost: 400, effect: "+4,000 Income XP", iconName: "DollarSign", skillId: 'inc', xpAmount: 4000, color: "text-green-400", rarity: "Rare", type: "Booster" },
+    { id: 'b1', name: "Coding Bootcamp", cost: 500, effect: "+5,000 Eng XP", iconName: "Code", skillId: 'eng', xpAmount: 5000, color: "text-blue-400", rarity: "Rare", type: "Booster" },
+    { id: 'b2', name: "Investment Seminar", cost: 300, effect: "+3,000 Equity XP", iconName: "TrendingUp", skillId: 'equ', xpAmount: 3000, color: "text-yellow-500", rarity: "Uncommon", type: "Booster" },
+    { id: 'b3', name: "Networking Ticket", cost: 200, effect: "+2,000 Inf XP", iconName: "Users", skillId: 'inf', xpAmount: 2000, color: "text-pink-400", rarity: "Uncommon", type: "Booster" },
+    { id: 'b4', name: "AI Symposium", cost: 600, effect: "+6,000 Eng XP", iconName: "Sparkles", skillId: 'eng', xpAmount: 6000, color: "text-blue-400", rarity: "Epic", type: "Booster" },
+    { id: 'b5', name: "Real Estate Course", cost: 1000, effect: "+10,000 Equity XP", iconName: "Hammer", skillId: 'equ', xpAmount: 10000, color: "text-yellow-500", rarity: "Legendary", type: "Booster" },
+    { id: 'b6', name: "Sales Masterclass", cost: 400, effect: "+4,000 Liq XP", iconName: "DollarSign", skillId: 'liq', xpAmount: 4000, color: "text-emerald-400", rarity: "Rare", type: "Booster" },
     { id: 'b7', name: "Fortress Plan", cost: 450, effect: "+4,500 Security XP", iconName: "Shield", skillId: 'sec', xpAmount: 4500, color: "text-slate-300", rarity: "Rare", type: "Booster" },
     { id: 'b8', name: "Biohack Training", cost: 350, effect: "+3,500 Vitality XP", iconName: "Heart", skillId: 'vit', xpAmount: 3500, color: "text-red-400", rarity: "Rare", type: "Booster" },
-    { id: 'b9', name: "Historical Texts", cost: 550, effect: "+5,500 Wisdom XP", iconName: "Star", skillId: 'wis', xpAmount: 5500, color: "text-indigo-400", rarity: "Rare", type: "Booster" },
-    { id: 'b10', name: "Resource Mapping", cost: 650, effect: "+6,500 Assets XP", iconName: "Pickaxe", skillId: 'ast', xpAmount: 6500, color: "text-yellow-500", rarity: "Epic", type: "Booster" },
-    { id: 'b11', name: "Liquidity Drill", cost: 300, effect: "+3,000 Cash Flow XP", iconName: "Activity", skillId: 'flo', xpAmount: 3000, color: "text-green-500", rarity: "Uncommon", type: "Booster" },
-    { id: 'b12', name: "Mindfulness Retreat", cost: 800, effect: "+8,000 Discipline XP", iconName: "Flame", skillId: 'dis', xpAmount: 8000, color: "text-amber-500", rarity: "Epic", type: "Booster" },
-    { id: 'b13', name: "Audience Workshop", cost: 700, effect: "+7,000 Content XP", iconName: "Target", skillId: 'cnt', xpAmount: 7000, color: "text-pink-400", rarity: "Rare", type: "Booster" },
+    { id: 'b9', name: "Historical Texts", cost: 550, effect: "+5,500 Intellect XP", iconName: "Book", skillId: 'int', xpAmount: 5500, color: "text-indigo-400", rarity: "Rare", type: "Booster" },
+    { id: 'b10', name: "Resource Mapping", cost: 650, effect: "+6,500 Equity XP", iconName: "Pickaxe", skillId: 'equ', xpAmount: 6500, color: "text-yellow-500", rarity: "Epic", type: "Booster" },
+    { id: 'b11', name: "Liquidity Drill", cost: 300, effect: "+3,000 Liq XP", iconName: "Activity", skillId: 'liq', xpAmount: 3000, color: "text-emerald-400", rarity: "Uncommon", type: "Booster" },
+    { id: 'b12', name: "Mindfulness Retreat", cost: 800, effect: "+8,000 Willpower XP", iconName: "Flame", skillId: 'wil', xpAmount: 8000, color: "text-amber-500", rarity: "Epic", type: "Booster" },
+    { id: 'b13', name: "Audience Workshop", cost: 700, effect: "+7,000 Inf XP", iconName: "Target", skillId: 'inf', xpAmount: 7000, color: "text-pink-400", rarity: "Rare", type: "Booster" },
   ],
   gear: [
     { id: 'd1', name: 'Plot Deed', iconName: 'Map', cost: 150000, rarity: 'Rare', effect: 'Grants ownership of a standard 16x16 land plot.', type: 'Deed' },
@@ -144,7 +139,7 @@ export const SHOP_ITEMS = {
   ]
 };
 
-// --- STATIC DATA: ESTATE ROOMS ---
+// --- STATIC DATA: ESTATE ROOMS (UPDATED FOR OCTAGON MODEL) ---
 export const ESTATE_ROOMS = [
     { id: 'expansion', name: 'Land Expansion', cost: 25000, icon: 'Expand', desc: `Expands grid to ${MAX_GRID_DIMENSION}x${MAX_GRID_DIMENSION} max`, type: 'Special', isExpansion: true },
     { id: 'plot_deed', name: 'Plot Deed', cost: PLOT_COST, icon: 'Map', desc: 'Claim a single plot of land', type: 'Special', isDeed: true },
@@ -153,9 +148,9 @@ export const ESTATE_ROOMS = [
     { id: 'kitchen', name: 'Chef Kitchen', cost: 6000, icon: 'Utensils', desc: '+5% Nutrition Efficiency', type: 'Sustenance', multiplier: 1.05 },
     { id: 'bathroom', name: 'Luxury Bath', cost: 4500, icon: 'Bath', desc: '+5% Focus Regen', type: 'Hygiene', multiplier: 1.05 },
     { id: 'gym', name: 'Home Gym', cost: 8000, icon: 'Dumbbell', desc: '+10% Vitality XP Gain', type: 'Health', multiplier: 1.1 },
-    { id: 'office', name: 'Command Center', cost: 12000, icon: 'Monitor', desc: '+10% Coding XP Gain', type: 'Tech', multiplier: 1.1 },
-    { id: 'library', name: 'Grand Library', cost: 10000, icon: 'Book', desc: '+10% Wisdom XP Gain', type: 'Knowledge', multiplier: 1.1 },
-    { id: 'studio', name: 'Content Studio', cost: 9000, icon: 'Camera', desc: '+10% Content XP Gain', type: 'Creative', multiplier: 1.1 },
+    { id: 'office', name: 'Command Center', cost: 12000, icon: 'Monitor', desc: '+10% Engineering XP Gain', type: 'Tech', multiplier: 1.1 },
+    { id: 'library', name: 'Grand Library', cost: 10000, icon: 'Book', desc: '+10% Intellect XP Gain', type: 'Knowledge', multiplier: 1.1 },
+    { id: 'studio', name: 'Content Studio', cost: 9000, icon: 'Camera', desc: '+10% Influence XP Gain', type: 'Creative', multiplier: 1.1 },
     { id: 'vault', name: 'Hidden Vault', cost: 20000, icon: 'Lock', desc: 'Protects streak from decay', type: 'Security', multiplier: 1.0 },
     { id: 'garden', name: 'Zen Garden', cost: 6000, icon: 'Sprout', desc: '+5 Energy Regen/Day', type: 'Wellness', multiplier: 1.0 },
 ];
@@ -170,7 +165,7 @@ export const WIDGET_DATABASE = [
     { id: 'mastery_log_widget', name: 'Mastery Overview', icon: 'Scroll', category: 'Skills', defaultSize: 'col-span-1' },
 ];
 
-// --- INITIAL DATA ---
+// --- INITIAL DATA (UPDATED FOR OCTAGON MODEL) ---
 export const initialData = {
   setupComplete: true, 
   lastVersion: null, 
@@ -183,7 +178,7 @@ export const initialData = {
   lastHourlyClaim: 0,
   monthlyExpenses: 3200,
   monthlyIncome: 4500,
-  bonusXP: { inc: 0, cod: 0, cnt: 0, ai: 0, sec: 300, vit: 0, wis: 0, net: 0, ast: 0, flo: 0, inv: 0, est: 0, dis: 0 },
+  bonusXP: { eng: 0, inf: 0, liq: 0, equ: 0, vit: 0, int: 0, sec: 300, wil: 0 }, // Updated keys
   assets: { realEstate: 0, crypto: 1200, metals: 0, digitalIP: 2500, stocks: 0, audience: 600 },
   liabilities: { debt: 2000, mortgage: 0 },
   wellness: { energy: 80, hydration: 60, focus: 45 },
@@ -217,29 +212,29 @@ export const initialData = {
   
   achievements: [
     { id: 'q1', title: "Hydrated", desc: "Drink a glass of water.", xp: 100, category: "Vitality", completed: false, difficulty: "Easy" },
-    { id: 'q2', title: "Hello World", desc: "Write 1 line of code.", xp: 150, category: "Code", completed: false, difficulty: "Easy" },
+    { id: 'q2', title: "Hello World", desc: "Write 1 line of code.", xp: 150, category: "Engineering", completed: false, difficulty: "Easy" },
     { id: 'q3', title: "First Step", desc: "Walk 1,000 steps.", xp: 100, category: "Vitality", completed: false, difficulty: "Easy" },
-    { id: 'q4', title: "Lurker", desc: "Join a Discord server.", xp: 150, category: "Network", completed: false, difficulty: "Easy" },
+    { id: 'q4', title: "Lurker", desc: "Join a Discord server.", xp: 150, category: "Influence", completed: false, difficulty: "Easy" },
     { id: 'q5', title: "Penny Saved", desc: "Save $10 this week.", xp: 200, category: "Security", completed: false, difficulty: "Easy" },
-    { id: 'q6', title: "Idea Log", desc: "Write down one business idea.", xp: 150, category: "Wisdom", completed: false, difficulty: "Easy" },
-    { id: 'q7', title: "Read a Page", desc: "Read 1 page of a book.", xp: 100, category: "Wisdom", completed: false, difficulty: "Easy" },
-    { id: 'q8', title: "Clean Desk", desc: "Organize your workspace.", xp: 100, category: "Discipline", completed: false, difficulty: "Easy" },
+    { id: 'q6', title: "Idea Log", desc: "Write down one business idea.", xp: 150, category: "Intellect", completed: false, difficulty: "Easy" },
+    { id: 'q7', title: "Read a Page", desc: "Read 1 page of a book.", xp: 100, category: "Intellect", completed: false, difficulty: "Easy" },
+    { id: 'q8', title: "Clean Desk", desc: "Organize your workspace.", xp: 100, category: "Willpower", completed: false, difficulty: "Easy" },
     { id: 'q10', title: "Gym Rat", desc: "Workout 3x in a week.", xp: 1000, category: "Vitality", completed: false, difficulty: "Medium", rewardItem: { id: 'r_energy_pack', name: "Energy Drink", type: "Consumable", desc: "+10 Energy", iconName: "Zap", rarity: "Common", count: 3 } },
-    { id: 'q11', title: "Freelancer", desc: "Earn your first $100 online.", xp: 1500, category: "Income", completed: false, difficulty: "Medium" },
-    { id: 'q12', title: "Stacker", desc: "Buy 1oz of Silver.", xp: 1200, category: "Assets", completed: false, difficulty: "Medium" },
-    { id: 'q13', title: "Content Creator", desc: "Post 1 video or article.", xp: 1000, category: "Content", completed: false, difficulty: "Medium" },
+    { id: 'q11', title: "Freelancer", desc: "Earn your first $100 online.", xp: 1500, category: "Liquidity", completed: false, difficulty: "Medium" },
+    { id: 'q12', title: "Stacker", desc: "Buy 1oz of Silver.", xp: 1200, category: "Equity", completed: false, difficulty: "Medium" },
+    { id: 'q13', title: "Content Creator", desc: "Post 1 video or article.", xp: 1000, category: "Influence", completed: false, difficulty: "Medium" },
     { id: 'q14', title: "Debt Chipper", desc: "Pay off $500 of debt.", xp: 2000, category: "Security", completed: false, difficulty: "Medium" },
-    { id: 'q15', title: "Script Kiddie", desc: "Build a simple calculator app.", xp: 2500, category: "Code", completed: false, difficulty: "Medium" },
-    { id: 'q16', title: "Cold Call", desc: "Reach out to 5 prospects.", xp: 1500, category: "Network", completed: false, difficulty: "Medium" },
+    { id: 'q15', title: "Script Kiddie", desc: "Build a simple calculator app.", xp: 2500, category: "Engineering", completed: false, difficulty: "Medium" },
+    { id: 'q16', title: "Cold Call", desc: "Reach out to 5 prospects.", xp: 1500, category: "Influence", completed: false, difficulty: "Medium" },
     { id: 'def_1', title: "Fortress of Solitude", desc: "Save 3 months expenses ($9.6k)", xp: 5000, category: 'Security', completed: false, difficulty: "Hard" },
     { id: 'def_3', title: "Debt Slayer", desc: "Eliminate all consumer debt", xp: 8000, category: 'Security', completed: false, difficulty: "Hard" },
-    { id: 'sk_2', title: "The First Dollar", desc: "Earn $1,000 online total", xp: 5000, category: 'Income', completed: false, difficulty: "Hard" },
-    { id: 'q17', title: "Landlord", desc: "Acquire your first rental property.", xp: 15000, category: "Estate", completed: false, difficulty: "Hard" },
-    { id: 'q18', title: "Gold Bug", desc: "Acquire 1oz of Gold.", xp: 6000, category: "Assets", completed: false, difficulty: "Hard" },
-    { id: 'q19', title: "1000 True Fans", desc: "Reach 1,000 Followers.", xp: 10000, category: "Content", completed: false, difficulty: "Hard" },
-    { id: 'q20', title: "SaaS Founder", desc: "Launch a paid product.", xp: 20000, category: "Code", completed: false, difficulty: "Hard" },
+    { id: 'sk_2', title: "The First Dollar", desc: "Earn $1,000 online total", xp: 5000, category: 'Liquidity', completed: false, difficulty: "Hard" },
+    { id: 'q17', title: "Landlord", desc: "Acquire your first rental property.", xp: 15000, category: "Equity", completed: false, difficulty: "Hard" },
+    { id: 'q18', title: "Gold Bug", desc: "Acquire 1oz of Gold.", xp: 6000, category: "Equity", completed: false, difficulty: "Hard" },
+    { id: 'q19', title: "1000 True Fans", desc: "Reach 1,000 Followers.", xp: 10000, category: "Influence", completed: false, difficulty: "Hard" },
+    { id: 'q20', title: "SaaS Founder", desc: "Launch a paid product.", xp: 20000, category: "Engineering", completed: false, difficulty: "Hard" },
     { id: 'q21', title: "1000lb Club", desc: "Squat/Bench/Deadlift 1000lbs total.", xp: 10000, category: "Vitality", completed: false, difficulty: "Hard" },
-    { id: 'q22', title: "Angel Investor", desc: "Invest in a startup.", xp: 12000, category: "Invest", completed: false, difficulty: "Hard" }
+    { id: 'q22', title: "Angel Investor", desc: "Invest in a startup.", xp: 12000, category: "Equity", completed: false, difficulty: "Hard" }
   ],
   
   widgetConfig: { 

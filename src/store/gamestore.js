@@ -341,27 +341,36 @@ export const useGameStore = create((set, get) => ({
     const state = get();
     const data = state.data;
     
-    const incXP = getXP(data.lifetime.totalIncomeBase * 10, 'inc', data); 
-    const codXP = getXP(35000 + ((data.assets?.digitalIP || 0) * 5), 'cod', data);
-    const cntXP = getXP(15000 + ((data.assets?.audience || 0) * 50), 'cnt', data);
-    const secXP = getXP((data.cash || 0) + (data.lifetime.totalDebtPrincipalPaid * 10), 'sec', data);
-    const astXP = getXP(data.lifetime.totalAssetAcquisitionCost * 5, 'ast', data);
-
-    const currentCashFlowValue = (data.monthlyIncome || 0) - (data.monthlyExpenses || 0);
-    const updatedPeakFlow = Math.max(data.lifetime.peakCashFlow, currentCashFlowValue * 20); 
-    const floXP = getXP(updatedPeakFlow, 'flo', data);
+    // --- UPDATED XP CALCULATIONS FOR OCTAGON MODEL (8 SKILLS) ---
+    // Engineering (eng): Coding + AI Ops + Tech Assets
+    const engXP = getXP(35000 + ((data.assets?.digitalIP || 0) * 10), 'eng', data);
     
-    const vitXP = getXP(85000, 'vit', data);
-    const wisXP = getXP(30000 + (data.achievements.filter(a => a.completed).length * 5000), 'wis', data);
-    const netXP = getXP(15000 + ((data.assets?.audience || 0) * 100), 'net', data);
-    const invXP = getXP(Math.max((data.assets?.stocks || 0) + (data.assets?.crypto || 0), 0), 'inv', data);
-    const estXP = getXP((data.assets?.realEstate || 0), 'est', data);
-    const disXP = getXP(0, 'dis', data);
-    const aiXP = getXP(40000, 'ai', data);
+    // Influence (inf): Content + Network + Audience
+    const infXP = getXP(15000 + ((data.assets?.audience || 0) * 50), 'inf', data);
+    
+    // Liquidity (liq): Income + Cash Flow + Cash
+    const currentCashFlowValue = (data.monthlyIncome || 0) - (data.monthlyExpenses || 0);
+    const liqXP = getXP((data.lifetime.totalIncomeBase * 2) + (currentCashFlowValue * 50) + (data.cash || 0), 'liq', data);
+    
+    // Equity (equ): Assets + Investments + Real Estate + Debt Repayment
+    const equXP = getXP(data.lifetime.totalAssetAcquisitionCost + (data.lifetime.totalDebtPrincipalPaid * 2) + (data.assets?.realEstate || 0) + (data.assets?.stocks || 0) + (data.assets?.crypto || 0), 'equ', data);
+    
+    // Vitality (vit): Health metrics (placeholder static base + future gym/sleep data)
+    const vitXP = getXP(85000 + ((data.statistics?.maintenance?.energy || 0) * 100), 'vit', data);
+    
+    // Intellect (int): Wisdom + Learning (achievements)
+    const intXP = getXP(30000 + (data.achievements.filter(a => a.completed).length * 5000), 'int', data);
+    
+    // Security (sec): Emergency fund (cash / expenses ratio) + defensive assets
+    const safetyMonths = data.monthlyExpenses > 0 ? (data.cash / data.monthlyExpenses) : 0;
+    const secXP = getXP((safetyMonths * 5000) + (data.assets?.metals || 0), 'sec', data);
+    
+    // Willpower (wil): Discipline + Streaks + Hard Tasks
+    const wilXP = getXP((data.discipline * 2) + (data.streak * 1000), 'wil', data);
 
     const skillXpMap = {
-        inc: incXP, cod: codXP, cnt: cntXP, ai: aiXP, sec: secXP, vit: vitXP, 
-        wis: wisXP, net: netXP, ast: astXP, flo: floXP, inv: invXP, est: estXP, dis: disXP
+        eng: engXP, inf: infXP, liq: liqXP, equ: equXP, 
+        vit: vitXP, int: intXP, sec: secXP, wil: wilXP
     };
 
     const totalXPs = skillXpMap;
