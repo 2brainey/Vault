@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { db } from '../config/firebase'; // Reverted: Removed .js
+import { db } from '../config/firebase'; 
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { 
     initialData, 
@@ -7,8 +7,9 @@ import {
     SHOP_ITEMS, 
     CARD_DATABASE,
     SKILL_DETAILS,
-    MAX_SKILL_LEVEL 
-} from '../data/gamedata'; // Reverted: Removed .js
+    MAX_SKILL_LEVEL,
+    DEFAULT_ESTATE_ITEMS
+} from '../data/gamedata';
 
 // --- HELPER FUNCTIONS ---
 
@@ -40,7 +41,13 @@ const mergeData = (base, saved) => {
       wellness: { ...base.wellness, ...(saved?.wellness || {}) },
       assets: { ...base.assets, ...(saved?.assets || {}) },
       liabilities: { ...base.liabilities, ...(saved?.liabilities || {}) },
-      lifetime: { ...base.lifetime, ...(saved?.lifetime || {}) }
+      lifetime: { ...base.lifetime, ...(saved?.lifetime || {}) },
+      // Merge estate data, ensuring shopItems are preserved if present in save
+      estate: { 
+          ...base.estate, 
+          ...(saved?.estate || {}),
+          shopItems: saved?.estate?.shopItems || base.estate.shopItems 
+      }
   };
   
   if (!saved?.layout?.home?.left_sidebar) {
@@ -70,7 +77,14 @@ const getXP = (base, id, data) => (Number(base) || 0) + (data.bonusXP?.[id] || 0
 // --- ZUSTAND STORE ---
 
 export const useGameStore = create((set, get) => ({
-  data: initialData,
+  data: {
+      ...initialData,
+      estate: {
+          grid: [ { type: 'empty', links: [] } ], 
+          gridDimension: 1,
+          shopItems: DEFAULT_ESTATE_ITEMS 
+      }
+  },
   userId: 'test-user-id', 
   loading: true,
   isSaving: false,
@@ -82,13 +96,42 @@ export const useGameStore = create((set, get) => ({
       const localData = localStorage.getItem('vault_save_v1');
       if (localData) {
           const parsed = JSON.parse(localData);
-          set({ data: mergeData(initialData, parsed), loading: false });
+          // Re-merge with current initialData to ensure new fields (like estate) are present
+          const baseData = {
+              ...initialData,
+              estate: {
+                  grid: [ { type: 'empty', links: [] } ],
+                  gridDimension: 1,
+                  shopItems: DEFAULT_ESTATE_ITEMS
+              }
+          };
+          set({ data: mergeData(baseData, parsed), loading: false });
       } else {
-          set({ data: initialData, loading: false });
+          set({ 
+              data: {
+                  ...initialData,
+                  estate: {
+                      grid: [ { type: 'empty', links: [] } ],
+                      gridDimension: 1,
+                      shopItems: DEFAULT_ESTATE_ITEMS
+                  }
+              }, 
+              loading: false 
+          });
       }
     } catch (error) {
       console.error("Load Error:", error);
-      set({ data: initialData, loading: false });
+      set({ 
+          data: {
+              ...initialData,
+              estate: {
+                  grid: [ { type: 'empty', links: [] } ],
+                  gridDimension: 1,
+                  shopItems: DEFAULT_ESTATE_ITEMS
+              }
+          }, 
+          loading: false 
+      });
     }
   },
 

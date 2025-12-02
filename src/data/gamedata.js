@@ -22,14 +22,13 @@ export const CURRENT_VERSION = "v33.0";
 export const INVENTORY_SLOTS = 28;
 export const BANK_SLOTS = 50;
 export const MAX_SKILL_LEVEL = 99;
-export const TOTAL_SKILLS = 8; // Updated to 8
+export const TOTAL_SKILLS = 8; 
 export const MAX_TOTAL_LEVEL = MAX_SKILL_LEVEL * TOTAL_SKILLS;
 export const CONTRACTS_PER_PAGE = 5;
 export const CARDS_PER_PAGE = 8;
 export const PLOT_COST = 1000;
 export const MAX_GRID_DIMENSION = 10;
 
-// --- NEW: GLOBAL CONSTANTS (Solves Magic Numbers) ---
 export const CONSTANTS = {
   TIME: {
     SECONDS_IN_MONTH: 2629746,
@@ -51,7 +50,6 @@ export const CONSTANTS = {
   }
 };
 
-// --- STATIC DATA: SKILL DETAILS (UPDATED OCTAGON MODEL) ---
 export const SKILL_DETAILS = {
   eng: { name: "Engineering", icon: "Code", color: "text-blue-400", desc: "Build & automate systems.", unlocks: [] },
   inf: { name: "Influence", icon: "Target", color: "text-pink-400", desc: "Reach & persuasion.", unlocks: [] },
@@ -63,7 +61,6 @@ export const SKILL_DETAILS = {
   wil: { name: "Willpower", icon: "Flame", color: "text-amber-500", desc: "Discipline & focus.", unlocks: [] },
 };
 
-// --- STATIC DATA: CARD DATABASE ---
 export const CARD_DATABASE = [
   { id: 'c1', name: "Hello World", rarity: "Common", desc: "Your first line of code.", iconName: "Code", value: 50 },
   { id: 'c2', name: "Syntax Error", rarity: "Common", desc: "A rite of passage.", iconName: "AlertTriangle", value: 50 },
@@ -87,7 +84,6 @@ export const CARD_DATABASE = [
   { id: 'l1', name: "The Singularity", rarity: "Legendary", desc: "Intelligence explosion.", iconName: "Dna", value: 5000 },
 ];
 
-// --- STATIC DATA: SHOP ITEMS (UPDATED REFERENCES) ---
 export const SHOP_ITEMS = {
   boosters: [
     { id: 'b1', name: "Coding Bootcamp", cost: 500, effect: "+5,000 Eng XP", iconName: "Code", skillId: 'eng', xpAmount: 5000, color: "text-blue-400", rarity: "Rare", type: "Booster" },
@@ -139,7 +135,6 @@ export const SHOP_ITEMS = {
   ]
 };
 
-// --- STATIC DATA: ESTATE ROOMS (UPDATED FOR OCTAGON MODEL) ---
 export const ESTATE_ROOMS = [
     { id: 'expansion', name: 'Land Expansion', cost: 25000, icon: 'Expand', desc: `Expands grid to ${MAX_GRID_DIMENSION}x${MAX_GRID_DIMENSION} max`, type: 'Special', isExpansion: true },
     { id: 'plot_deed', name: 'Plot Deed', cost: PLOT_COST, icon: 'Map', desc: 'Claim a single plot of land', type: 'Special', isDeed: true },
@@ -155,7 +150,6 @@ export const ESTATE_ROOMS = [
     { id: 'garden', name: 'Zen Garden', cost: 6000, icon: 'Sprout', desc: '+5 Energy Regen/Day', type: 'Wellness', multiplier: 1.0 },
 ];
 
-// NEW: Widget Database for the drag-and-drop source panel
 export const WIDGET_DATABASE = [
     { id: 'productivity_timer', name: 'Focus Timer', icon: 'Clock', category: 'Focus', defaultSize: 'col-span-1' },
     { id: 'task_command_center', name: 'Kanban Board', icon: 'Trello', category: 'Task', defaultSize: 'col-span-2' },
@@ -165,7 +159,6 @@ export const WIDGET_DATABASE = [
     { id: 'mastery_log_widget', name: 'Mastery Overview', icon: 'Scroll', category: 'Skills', defaultSize: 'col-span-1' },
 ];
 
-// --- INITIAL DATA (UPDATED FOR OCTAGON MODEL) ---
 export const initialData = {
   setupComplete: true, 
   lastVersion: null, 
@@ -178,7 +171,7 @@ export const initialData = {
   lastHourlyClaim: 0,
   monthlyExpenses: 3200,
   monthlyIncome: 4500,
-  bonusXP: { eng: 0, inf: 0, liq: 0, equ: 0, vit: 0, int: 0, sec: 300, wil: 0 }, // Updated keys
+  bonusXP: { eng: 0, inf: 0, liq: 0, equ: 0, vit: 0, int: 0, sec: 300, wil: 0 },
   assets: { realEstate: 0, crypto: 1200, metals: 0, digitalIP: 2500, stocks: 0, audience: 600 },
   liabilities: { debt: 2000, mortgage: 0 },
   wellness: { energy: 80, hydration: 60, focus: 45 },
@@ -268,3 +261,36 @@ export const initialData = {
     }
   }
 };
+
+// --- STATIC DATA: ESTATE PROTOTYPE CONFIGURATION ---
+export const PLOT_SQUARE_FOOTAGE = 10000;
+export const PLOT_COST = 25000;
+export const PLOT_DIMENSION_M = 100; // 100m x 100m plot
+export const EXPANSION_TIERS = [
+    { size: 2, cost: 5000, desc: "Expands blueprint to 2x2 plots." }, 
+    { size: 3, cost: 20000, desc: "Expands blueprint to 3x3 plots." },
+    { size: 4, cost: 50000, desc: "Expands blueprint to 4x4 plots." },
+    { size: 5, cost: 100000, desc: "Expands blueprint to 5x5 plots." },
+    { size: 6, cost: 200000, desc: "Expands blueprint to 6x6 plots." },
+    { size: 7, cost: 350000, desc: "Expands blueprint to 7x7 plots." },
+    { size: 8, cost: 600000, desc: "Expands blueprint to 8x8 plots." },
+    { size: 9, cost: 900000, desc: "Expands blueprint to 9x9 plots." },
+    { size: 10, cost: 1300000, desc: "Expands blueprint to 10x10 plots." },
+];
+
+export const MODULAR_ROOMS = [
+    { id: 'module_bedroom', name: 'M-Bedroom', cost: 1500, icon: 'Bed', desc: 'Modular resting unit.', type: 'Rest', category: 'Build', sqft: 2000, length: 40, width: 50 },
+    { id: 'module_bathroom', name: 'M-Bathroom', cost: 1000, icon: 'Bath', desc: 'Modular hygiene unit.', type: 'Hygiene', category: 'Build', sqft: 60, length: 6, width: 10 }, 
+    { id: 'module_kitchen', name: 'M-Kitchen', cost: 3000, icon: 'Utensils', desc: 'Modular sustenance unit.', type: 'Sustenance', category: 'Build', sqft: 2500, length: 50, width: 50 },
+    { id: 'module_laundry', name: 'M-Laundry', cost: 1500, icon: 'Box', desc: 'Modular laundry unit.', type: 'Utility', category: 'Build', sqft: 1000, length: 20, width: 50 },
+    { id: 'module_living', name: 'M-Living', cost: 3000, icon: 'Home', desc: 'Modular social unit.', type: 'Social', category: 'Build', sqft: 1500, length: 30, width: 50 },
+];
+
+export const DEFAULT_ESTATE_ITEMS = [
+    ...MODULAR_ROOMS,
+    { id: 'bathroom_std', name: 'Bathroom (Std)', cost: 2000, icon: 'Bath', desc: 'Basic hygiene. Slightly larger footprint.', type: 'Hygiene', category: 'Build', priority: 2, sqft: 80, length: 8, width: 10 },
+    { id: 'custom_lab', name: 'Bio-Lab', cost: 20000, icon: 'Droplet', desc: 'High-tech research facility.', type: 'Tech', category: 'Build', priority: 4, sqft: 5000, length: 100, width: 50 },
+    { id: 'plot_deed_special', name: 'Land Deed', cost: PLOT_COST, icon: 'Map', desc: 'Claim an unowned plot.', type: 'Deed', isDeed: true, priority: 0, sqft: PLOT_SQUARE_FOOTAGE, category: 'Deeds' },
+    { id: 'd2', name: 'Estate Title', cost: 500000, icon: 'Home', desc: 'Property tax reduction.', skillReq: { skill: 'Equity', level: 10 }, category: 'Deeds' },
+    { id: 'd3', name: 'Business License', cost: 2500000, icon: 'Trophy', desc: 'Operate vendor stall.', skillReq: { skill: 'Equity', level: 50 }, category: 'Deeds' },
+];

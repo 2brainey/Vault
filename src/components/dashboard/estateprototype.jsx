@@ -1,4 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useGameStore } from '../../store/gamestore'; 
+import { 
+    PLOT_SQUARE_FOOTAGE, PLOT_COST, PLOT_DIMENSION_M, 
+    EXPANSION_TIERS, DEFAULT_ESTATE_ITEMS, MAX_GRID_DIMENSION 
+} from '../../data/gamedata'; 
 
 // --- 1. ASSETS & ICONS ---
 const Icon = ({ d, size = 16, className = "" }) => (
@@ -60,49 +65,7 @@ const RenderIcon = ({ name, size = 16, className = "" }) => {
     return <IconComponent size={size} className={className} />;
 };
 
-// --- 2. GAME DATA ---
-const PLOT_SQUARE_FOOTAGE = 10000;
-const PLOT_COST = 25000;
-const PLOT_DIMENSION_M = 100; // 100m x 100m plot
-const MAX_GRID_DIMENSION = 10;
-const ZOOM_STEP = 0.1;
-const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 2.0;
-
-const EXPANSION_TIERS = [
-    { size: 2, cost: 5000, desc: "Expands blueprint to 2x2 plots." }, 
-    { size: 3, cost: 20000, desc: "Expands blueprint to 3x3 plots." },
-    { size: 4, cost: 50000, desc: "Expands blueprint to 4x4 plots." },
-    { size: 5, cost: 100000, desc: "Expands blueprint to 5x5 plots." },
-    { size: 6, cost: 200000, desc: "Expands blueprint to 6x6 plots." },
-    { size: 7, cost: 350000, desc: "Expands blueprint to 7x7 plots." },
-    { size: 8, cost: 600000, desc: "Expands blueprint to 8x8 plots." },
-    { size: 9, cost: 900000, desc: "Expands blueprint to 9x9 plots." },
-    { size: 10, cost: 1300000, desc: "Expands blueprint to 10x10 plots." },
-];
-
-// Modular Rooms 
-const MODULAR_ROOMS = [
-    { id: 'module_bedroom', name: 'M-Bedroom', cost: 1500, icon: 'Bed', desc: 'Modular resting unit.', type: 'Rest', category: 'Build', sqft: 2000, length: 40, width: 50 },
-    { id: 'module_bathroom', name: 'M-Bathroom', cost: 1000, icon: 'Bath', desc: 'Modular hygiene unit.', type: 'Hygiene', category: 'Build', sqft: 60, length: 6, width: 10 }, 
-    { id: 'module_kitchen', name: 'M-Kitchen', cost: 3000, icon: 'Utensils', desc: 'Modular sustenance unit.', type: 'Sustenance', category: 'Build', sqft: 2500, length: 50, width: 50 },
-    { id: 'module_laundry', name: 'M-Laundry', cost: 1500, icon: 'Box', desc: 'Modular laundry unit.', type: 'Utility', category: 'Build', sqft: 1000, length: 20, width: 50 },
-    { id: 'module_living', name: 'M-Living', cost: 3000, icon: 'Home', desc: 'Modular social unit.', type: 'Social', category: 'Build', sqft: 1500, length: 30, width: 50 },
-];
-
 // ** CATALOG ITEMS **
-const DEFAULT_ITEMS = [
-    ...MODULAR_ROOMS,
-    { id: 'bathroom_std', name: 'Bathroom (Std)', cost: 2000, icon: 'Bath', desc: 'Basic hygiene. Slightly larger footprint.', type: 'Hygiene', category: 'Build', priority: 2, sqft: 80, length: 8, width: 10 },
-    
-    { id: 'custom_lab', name: 'Bio-Lab', cost: 20000, icon: 'Droplet', desc: 'High-tech research facility.', type: 'Tech', category: 'Build', priority: 4, sqft: 5000, length: 100, width: 50 },
-    
-    // -- DEEDS --
-    { id: 'plot_deed_special', name: 'Land Deed', cost: PLOT_COST, icon: 'Map', desc: 'Claim an unowned plot.', type: 'Deed', isDeed: true, priority: 0, sqft: PLOT_SQUARE_FOOTAGE, category: 'Deeds' },
-    { id: 'd2', name: 'Estate Title', cost: 500000, icon: 'Home', desc: 'Property tax reduction.', skillReq: { skill: 'Equity', level: 10 }, category: 'Deeds' },
-    { id: 'd3', name: 'Business License', cost: 2500000, icon: 'Trophy', desc: 'Operate vendor stall.', skillReq: { skill: 'Equity', level: 50 }, category: 'Deeds' },
-];
-
 const CATEGORY_COLORS = {
     'Special': { text: 'text-amber-400', border: 'border-amber-700', bg: 'bg-amber-900/50' },
     'Build': { text: 'text-blue-400', border: 'border-blue-700', bg: 'bg-blue-900/50' },
@@ -563,19 +526,22 @@ const AddItemModal = ({ onSave, onClose }) => {
 };
 
 // --- 4. MAIN ESTATE COMPONENT ---
-// UPDATED: Accept props for discipline and salvage directly
 const EstatePrototype = ({ discipline, setDiscipline, salvage, setSalvage }) => {
-    // REMOVED: const [discipline, setDiscipline] = useState(150000);
-    // REMOVED: const [salvage, setSalvage] = useState(15);
-    const [gridDimension, setGridDimension] = useState(1);
+    const { data, updateData } = useGameStore();
+
+    const [gridDimension, setGridDimension] = useState(data.estate?.gridDimension || 1);
     
     const [grid, setGrid] = useState(() => {
+        const savedGrid = data.estate?.grid;
+        if (savedGrid) return savedGrid;
+        
         const initial = new Array(1 * 1).fill(null);
         initial[0] = { type: 'empty', links: [] };
         return initial;
     });
 
-    const [shopItems, setShopItems] = useState(DEFAULT_ITEMS);
+    const shopItems = data.estate?.shopItems || DEFAULT_ESTATE_ITEMS;
+
     const [userSkills] = useState({ Engineering: 45, Influence: 20, Liquidity: 60, Equity: 15, Vitality: 30, Intellect: 50, Security: 10, Willpower: 25 });
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [pendingBuildItem, setPendingBuildItem] = useState(null);
@@ -592,9 +558,30 @@ const EstatePrototype = ({ discipline, setDiscipline, salvage, setSalvage }) => 
     const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
     const [plotContentEditData, setPlotContentEditData] = useState(null); 
     
+    // --- Helper to persist estate data changes ---
+    const updateEstateData = useCallback((newProps) => {
+        updateData(prev => ({
+            estate: {
+                ...(prev.estate || {}),
+                ...newProps
+            }
+        }));
+    }, [updateData]);
+
+    // --- Persist Grid and Dimension Changes ---
+    useEffect(() => {
+        updateEstateData({
+            grid: grid,
+            gridDimension: gridDimension,
+        });
+    }, [grid, gridDimension, updateEstateData]);
+
     const handleWheel = (e) => {
         if (e.target.closest('.shop-sidebar') || e.target.closest('.header-bar')) return;
         e.preventDefault();
+        const ZOOM_STEP = 0.1;
+        const MIN_ZOOM = 0.5;
+        const MAX_ZOOM = 2.0;
         const direction = e.deltaY > 0 ? -1 : 1;
         setZoomLevel(prev => {
             const newZoom = parseFloat((prev + direction * ZOOM_STEP).toFixed(1));
@@ -640,6 +627,9 @@ const EstatePrototype = ({ discipline, setDiscipline, salvage, setSalvage }) => 
     };
 
     const handleZoomBtn = (direction) => {
+        const ZOOM_STEP = 0.1;
+        const MIN_ZOOM = 0.5;
+        const MAX_ZOOM = 2.0;
         setZoomLevel(prev => {
             const newZoom = parseFloat((prev + direction * ZOOM_STEP).toFixed(1));
             return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, newZoom));
@@ -652,7 +642,7 @@ const EstatePrototype = ({ discipline, setDiscipline, salvage, setSalvage }) => 
     
     const handleMaintain = (index) => {
         const salvageGain = Math.floor(Math.random() * 3) + 1;
-        setSalvage(salvage + salvageGain); // UPDATED to use prop setter
+        setSalvage(salvage + salvageGain); 
         showMessage(`Maintained plot ${index + 1}! Gained ${salvageGain} Salvage.`, "Maintenance Complete");
     };
     
@@ -778,19 +768,22 @@ const EstatePrototype = ({ discipline, setDiscipline, salvage, setSalvage }) => 
     };
     
     const handleItemPropertySave = (id, updatedProperties) => {
-        setShopItems(prev => prev.map(i => i.id === id ? { ...i, ...updatedProperties } : i));
+        const newShopItems = shopItems.map(i => i.id === id ? { ...i, ...updatedProperties } : i);
+        updateEstateData({ shopItems: newShopItems }); // Persist changes to global store
         setPropertyEditData(null);
     };
     
     const handleItemDelete = (id) => {
-        setShopItems(prev => prev.filter(i => i.id !== id));
+        const newShopItems = shopItems.filter(i => i.id !== id);
+        updateEstateData({ shopItems: newShopItems }); // Persist changes to global store
         setPropertyEditData(null);
         showMessage(`Item ID: ${id} successfully deleted from the catalog.`, "Deletion Complete");
     }
 
     const handleAddItem = (newItem) => {
         const finalItem = { ...newItem, id: newItem.id.replace(/\s/g, '_'), sqft: newItem.length * newItem.width, runtimeId: Date.now() };
-        setShopItems(prev => [...prev, finalItem]);
+        const newShopItems = [...shopItems, finalItem];
+        updateEstateData({ shopItems: newShopItems }); // Persist changes to global store
         showMessage(`New item '${finalItem.name}' added to the catalog!`, "Catalog Updated");
         setIsAddItemModalOpen(false);
     };
@@ -847,9 +840,9 @@ const EstatePrototype = ({ discipline, setDiscipline, salvage, setSalvage }) => 
                     </div>
                     
                     <div className="absolute top-6 right-6 z-20 pointer-events-auto flex gap-2">
-                        <button onClick={() => handleZoomBtn(-1)} disabled={zoomLevel <= MIN_ZOOM} className="p-2 bg-black/60 border border-slate-600 rounded hover:bg-slate-700 disabled:opacity-30"><RenderIcon name="ZoomOut"/></button>
+                        <button onClick={() => handleZoomBtn(-1)} disabled={zoomLevel <= 0.5} className="p-2 bg-black/60 border border-slate-600 rounded hover:bg-slate-700 disabled:opacity-30"><RenderIcon name="ZoomOut"/></button>
                         <button onClick={handleZoomReset} className="p-2 bg-black/60 border border-slate-600 rounded hover:bg-slate-700 font-mono text-xs text-white">{(zoomLevel*100).toFixed(0)}%</button>
-                        <button onClick={() => handleZoomBtn(1)} disabled={zoomLevel >= MAX_ZOOM} className="p-2 bg-black/60 border border-slate-600 rounded hover:bg-slate-700 disabled:opacity-30"><RenderIcon name="ZoomIn"/></button>
+                        <button onClick={() => handleZoomBtn(1)} disabled={zoomLevel >= 2.0} className="p-2 bg-black/60 border border-slate-600 rounded hover:bg-slate-700 disabled:opacity-30"><RenderIcon name="ZoomIn"/></button>
                     </div>
 
                     {/* Grid Container */}
