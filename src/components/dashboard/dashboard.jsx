@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useGameStore } from '../../store/gamestore'; 
 import { SHOP_ITEMS, CARD_DATABASE, SKILL_DETAILS, WIDGET_DATABASE, CONSTANTS } from '../../data/gamedata'; 
-import { InventoryGrid, ContractWidget, MasteryModal, InputGroup, InputField } from './dashboardui'; 
+import { 
+  InventoryGrid, 
+  ContractWidget, 
+  MasteryModal, 
+  InputGroup, 
+  InputField,  
+} from './dashboardui';
 import { RenderIcon } from './dashboardutils';
 import ShopFullPage from './shopfullpage'; 
 import EstatePrototype from './estateprototype';
@@ -240,7 +246,7 @@ export default function VaultDashboard() {
                  <div className="flex gap-1"><button onClick={toggleFocus} className={`p-2 rounded ${focusActive ? 'bg-yellow-600 hover:bg-yellow-500 text-black' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}><RenderIcon name={focusActive ? "Pause" : "Play"} size={16} fill="currentColor"/></button><button onClick={resetFocus} className="p-2 rounded bg-slate-700 hover:bg-slate-600 text-slate-300"><RenderIcon name="RotateCcw" size={16}/></button></div>
              </div>
              <nav className="flex p-1 rounded-lg bg-[#232a3a] border border-[#404e6d]">
-                {[{id:'dynamic', l:'HOME', i:'Home'}, {id:'vault', l:'VAULT', i:'Lock'}, {id:'analytics', l:'ANALYTICS', i:'Activity'}, {id:'shop', l:'SHOP', i:'ShoppingBag'}].map(t => (
+                {[{id:'dynamic', l:'HOME', i:'Home'}, {id:'vault', l:'VAULT', i:'Lock'}, {id:'analytics', l:'ANALYTICS', i:'Activity'}, {id:'database', l:'DATABASE', i:'Database'}, {id:'shop', l:'SHOP', i:'ShoppingBag'}].map(t => (
                     <button key={t.id} onClick={() => setActiveTab(t.id)} className={`px-4 py-2 text-xs font-bold rounded flex items-center gap-2 transition-all ${activeTab===t.id ? 'bg-amber-500 text-black' : 'text-slate-400 hover:text-white'}`}><RenderIcon name={t.i} size={16}/> <span className="hidden md:inline">{t.l}</span></button>
                 ))}
              </nav>
@@ -326,7 +332,6 @@ export default function VaultDashboard() {
                 </div>
             </div>
         )}
-        {/* ... Analytics and Shop tabs follow same pattern ... */}
         {activeTab === 'analytics' && (
             <div className="flex h-full">
                 <div className="w-56 bg-[#131313] border-r border-slate-700 p-2 flex flex-col gap-1">
@@ -337,6 +342,11 @@ export default function VaultDashboard() {
                     {analyticsSubTab === 'logistics' && <LogisticsDashboard />}
                     {analyticsSubTab === 'inputs' && <div className="max-w-4xl mx-auto space-y-6"><InputGroup title="Liquid & Income"><InputField label="Cash ($)" value={data.cash} onChange={(v)=>updateNestedData('cash',v)} /><InputField label="Monthly Income" value={data.monthlyIncome} onChange={(v)=>updateNestedData('monthlyIncome',v)} /></InputGroup><InputGroup title="Assets"><InputField label="Real Estate" value={data.assets.realEstate} onChange={(v)=>updateAsset('realEstate',v)} /><InputField label="Crypto" value={data.assets.crypto} onChange={(v)=>updateAsset('crypto',v)} /></InputGroup></div>}
                 </div>
+            </div>
+        )}
+        {activeTab === 'database' && ( // NEW DATABASE TAB RENDER
+            <div className="h-full w-full">
+                <DatabaseInterface />
             </div>
         )}
         {activeTab === 'shop' && <ShopFullPage onPurchase={purchaseItem} discipline={data.discipline} inventory={data.inventory} lastDailyClaim={data.lastDailyClaim} lastHourlyClaim={data.lastHourlyClaim} onClaimDaily={handleClaimDaily} onClaimHourly={handleClaimHourly}/>}
