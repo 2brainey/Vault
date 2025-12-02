@@ -264,7 +264,7 @@ export const initialData = {
 
 // --- STATIC DATA: ESTATE PROTOTYPE CONFIGURATION ---
 export const PLOT_SQUARE_FOOTAGE = 10000;
-export const PLOT_COST = 25000;
+export const PLOT_BASE_COST = 25000;
 export const PLOT_DIMENSION_M = 100; // 100m x 100m plot
 export const EXPANSION_TIERS = [
     { size: 2, cost: 5000, desc: "Expands blueprint to 2x2 plots." }, 
@@ -290,7 +290,7 @@ export const DEFAULT_ESTATE_ITEMS = [
     ...MODULAR_ROOMS,
     { id: 'bathroom_std', name: 'Bathroom (Std)', cost: 2000, icon: 'Bath', desc: 'Basic hygiene. Slightly larger footprint.', type: 'Hygiene', category: 'Build', priority: 2, sqft: 80, length: 8, width: 10 },
     { id: 'custom_lab', name: 'Bio-Lab', cost: 20000, icon: 'Droplet', desc: 'High-tech research facility.', type: 'Tech', category: 'Build', priority: 4, sqft: 5000, length: 100, width: 50 },
-    { id: 'plot_deed_special', name: 'Land Deed', cost: PLOT_COST, icon: 'Map', desc: 'Claim an unowned plot.', type: 'Deed', isDeed: true, priority: 0, sqft: PLOT_SQUARE_FOOTAGE, category: 'Deeds' },
+    { id: 'plot_deed_special', name: 'Land Deed', cost: PLOT_BASE_COST, icon: 'Map', desc: 'Claim an unowned plot.', type: 'Deed', isDeed: true, priority: 0, sqft: PLOT_SQUARE_FOOTAGE, category: 'Deeds' },
     { id: 'd2', name: 'Estate Title', cost: 500000, icon: 'Home', desc: 'Property tax reduction.', skillReq: { skill: 'Equity', level: 10 }, category: 'Deeds' },
     { id: 'd3', name: 'Business License', cost: 2500000, icon: 'Trophy', desc: 'Operate vendor stall.', skillReq: { skill: 'Equity', level: 50 }, category: 'Deeds' },
 ];
