@@ -96,16 +96,37 @@ export default function VaultDashboard() {
   const [analyticsSubTab, setAnalyticsSubTab] = useState('stats');
 
   const showToast = useCallback((msg, type) => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); }, []);
+
+  // --- CRITICAL HANDLER DEFINITIONS (Fixes ReferenceErrors) ---
   const handleSetDiscipline = (val) => setDiscipline(val);
-  const purchaseItem = (i, c) => { const r = purchaseItemAction(i, c); showToast(r.message, r.success?'success':'error'); };
-  const handleUseItem = (i, idx, cId) => { const r = handleUseItemAction(i, idx, cId); showToast(r.message, r.success?'success':'error'); };
-  const toggleAchievement = (id) => { const r = toggleAchievementAction(id, !data.achievements.find(a=>a.id===id).completed); if(r.success) showToast(r.rewardMsg || 'Updated', 'success'); };
-  const handleClaimMasteryReward = (sId, lvl, rwd) => { const r = handleClaimMasteryRewardAction(sId, lvl, rwd); if(r.success) { setSkillModal(null); showToast(r.message, 'success'); } else showToast(r.message, 'error'); };
+  const handleSetSalvage = (newSalvage) => updateData({ salvage: newSalvage });
+  
+  const purchaseItem = (i, c) => { 
+      const r = purchaseItemAction(i, c); 
+      showToast(r.message, r.success ? 'success' : 'error'); 
+  };
+  
+  const handleUseItem = (i, idx, cId) => { 
+      const r = handleUseItemAction(i, idx, cId); 
+      showToast(r.message, r.success ? 'success' : 'error'); 
+  };
+  
+  const toggleAchievement = (id) => { 
+      const r = toggleAchievementAction(id, !data.achievements.find(a => a.id === id).completed); 
+      if (r.success) showToast(r.rewardMsg || 'Updated', 'success'); 
+  };
+  
+  const handleClaimMasteryReward = (sId, lvl, rwd) => { 
+      const r = handleClaimMasteryRewardAction(sId, lvl, rwd); 
+      if (r.success) { setSkillModal(null); showToast(r.message, 'success'); } 
+      else showToast(r.message, 'error'); 
+  };
   
   const handleClaimDaily = () => { const r = claimDailyAction(); showToast(r.message, r.success ? 'success' : 'error'); };
   const handleClaimHourly = () => { const r = claimHourlyAction(); showToast(r.message, r.success ? 'success' : 'error'); };
   const handleMaintainVital = (type) => { const result = updateWellness(type, 20); if (result && result.message) showToast(result.message, 'success'); };
   const updateAsset = (key, value) => { const val = parseInt(value) || 0; updateNestedData(`assets.${key}`, val); };
+  // --- END HANDLER DEFINITIONS ---
 
   const { calculatedSkills: playerSkills, totalXPs } = useMemo(() => getSkillData(), [data, getSkillData]);
   const combatStats = useMemo(() => ({ totalLevel: playerSkills.reduce((s,x)=>s+x.level,0), combatLevel: Math.floor(playerSkills.reduce((s,x)=>s+x.level,0)/4) }), [playerSkills]);
@@ -191,7 +212,6 @@ export default function VaultDashboard() {
                     {location === 'center' && (
                         <button onClick={(e) => { e.stopPropagation(); cycleWidgetSize(widgetId); }} className="p-1 bg-black/80 rounded text-white hover:bg-amber-500 hover:text-black border border-slate-600" title="Resize Widget (Cycle Width)"><RenderIcon name="Maximize" size={14}/></button>
                     )}
-                    {/* Changed to Trash Icon for Deletion */}
                     <button onClick={(e) => { e.stopPropagation(); removeWidget(widgetId); }} className="p-1 bg-black/80 rounded text-red-400 hover:bg-red-600 hover:text-white border border-slate-600" title="Remove Widget"><RenderIcon name="Trash2" size={14}/></button>
                 </div>
             )}
@@ -236,7 +256,6 @@ export default function VaultDashboard() {
                     </div>
                 </div>
              </div>
-             {/* ... rate trackers and timer ... */}
              <div className="hidden md:flex items-center gap-6 text-xs bg-black/20 px-4 py-2 rounded-lg border border-slate-700/50">
                  <div className="flex flex-col items-center"><span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Passive Inc</span><span className="font-mono text-emerald-400 font-bold">${dollarsPerSecond}/s</span></div>
                  <div className="flex flex-col items-center"><span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Active Focus</span><span className="font-mono text-pink-400 font-bold">+{currentFocusRate} BM/s</span></div>
@@ -327,8 +346,8 @@ export default function VaultDashboard() {
                 </div>
                 <div className="flex-1 overflow-y-auto p-6 bg-[#0f1219]">
                     {vaultSubTab === 'profile' && <div className="grid grid-cols-2 gap-6"><div className="rounded-xl border border-slate-700 bg-[#1e1e1e] p-6"><h3 className="text-xl font-bold text-white mb-4">Player Status</h3><div className="flex gap-4 items-center"><div className="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center text-3xl">🧙‍♂️</div><div><div className="text-2xl font-bold text-white">Lvl {combatStats.totalLevel} Architect</div><div className="text-amber-500 font-mono">Combat Lvl: {combatStats.combatLevel}</div></div></div></div> <div className="rounded-xl border border-slate-700 bg-[#1e1e1e] p-0 overflow-hidden"><ContractWidget contracts={data.achievements} onToggle={toggleAchievement} /></div></div>}
-                    {vaultSubTab === 'inventory' && <InventoryView inventory={data.inventory} bank={data.bank} discipline={data.discipline} cash={data.cash} salvage={data.salvage} onUseItem={handleUseItem} />}
-                    {vaultSubTab === 'estate' && <EstatePrototype discipline={data.discipline} setDiscipline={handleSetDiscipline} />}
+                    {vaultSubTab === 'inventory' && <InventoryView inventory={data.inventory} bank={data.bank} bankBalance={data.bankBalance} cards={data.cards} discipline={data.discipline} cash={data.cash} salvage={data.salvage} onUpdateInventory={(inv) => updateData({ inventory: inv })} onUpdateBank={(bank) => updateData({ bank: bank })} onUpdateBankBalance={(bal) => updateData({ bankBalance: bal })} onUpdateCards={(cards) => updateData({ cards: cards })} onUpdateDiscipline={(dsc) => setDiscipline(dsc)} onUseItem={handleUseItem} />}
+                    {vaultSubTab === 'estate' && <EstatePrototype discipline={data.discipline} setDiscipline={handleSetDiscipline} salvage={data.salvage} setSalvage={handleSetSalvage} />}
                 </div>
             </div>
         )}
@@ -344,9 +363,9 @@ export default function VaultDashboard() {
                 </div>
             </div>
         )}
-        {activeTab === 'database' && ( // NEW DATABASE TAB RENDER
-            <div className="h-full w-full">
-                <DatabaseInterface />
+        {activeTab === 'database' && ( 
+            <div className="h-full w-full flex items-center justify-center text-slate-500">
+                Database Interface Placeholder
             </div>
         )}
         {activeTab === 'shop' && <ShopFullPage onPurchase={purchaseItem} discipline={data.discipline} inventory={data.inventory} lastDailyClaim={data.lastDailyClaim} lastHourlyClaim={data.lastHourlyClaim} onClaimDaily={handleClaimDaily} onClaimHourly={handleClaimHourly}/>}

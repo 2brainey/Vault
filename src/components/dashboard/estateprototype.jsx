@@ -563,9 +563,10 @@ const AddItemModal = ({ onSave, onClose }) => {
 };
 
 // --- 4. MAIN ESTATE COMPONENT ---
-const EstatePrototype = () => {
-    const [discipline, setDiscipline] = useState(150000);
-    const [salvage, setSalvage] = useState(15);
+// UPDATED: Accept props for discipline and salvage directly
+const EstatePrototype = ({ discipline, setDiscipline, salvage, setSalvage }) => {
+    // REMOVED: const [discipline, setDiscipline] = useState(150000);
+    // REMOVED: const [salvage, setSalvage] = useState(15);
     const [gridDimension, setGridDimension] = useState(1);
     
     const [grid, setGrid] = useState(() => {
@@ -648,9 +649,10 @@ const EstatePrototype = () => {
 
     const closeModal = () => setModal({ isOpen: false, message: '', isConfirm: false, onConfirm: null, title: '' });
     const showMessage = (message, title = "Notification") => setModal({ isOpen: true, message, isConfirm: false, onConfirm: closeModal, title });
+    
     const handleMaintain = (index) => {
         const salvageGain = Math.floor(Math.random() * 3) + 1;
-        setSalvage(s => s + salvageGain);
+        setSalvage(salvage + salvageGain); // UPDATED to use prop setter
         showMessage(`Maintained plot ${index + 1}! Gained ${salvageGain} Salvage.`, "Maintenance Complete");
     };
     
@@ -699,7 +701,7 @@ const EstatePrototype = () => {
         }
         setGrid(newGrid);
         setGridDimension(newDim);
-        setDiscipline(d => d - nextExpansionTier.cost);
+        setDiscipline(discipline - nextExpansionTier.cost);
         showMessage(`Estate expanded to ${newDim}x${newDim} successfully.`, "Expansion Complete");
     };
 
@@ -724,7 +726,7 @@ const EstatePrototype = () => {
         if (discipline < item.cost) { showMessage("Insufficient Brain Matter!", "Failed"); return; }
         if (item.id === 'blueprint_expansion') { expandGrid(item); setPendingBuildItem(null); return; }
         if (item.category === 'Build' || item.category === 'Deeds') { setPendingBuildItem(item); setShopOpen(false); return; }
-        setDiscipline(d => d - item.cost);
+        setDiscipline(discipline - item.cost);
         showMessage(`Purchased ${item.name}! Check inventory.`, "Success");
     };
 
@@ -733,7 +735,7 @@ const EstatePrototype = () => {
         const newGrid = [...grid];
         newGrid[index] = { type: 'empty', links: [] }; 
         setGrid(newGrid);
-        setDiscipline(d => d - cost);
+        setDiscipline(discipline - cost);
         setPendingBuildItem(null);
         setSelectedSlot(null);
         setPlotAcquisitionData(null);
@@ -751,7 +753,7 @@ const EstatePrototype = () => {
         const newItemInstance = { ...item, runtimeId: Date.now() + Math.random(), placement: 'centered' };
         newGrid[index] = { type: 'built', sqft: newTotalSF, links: existingLinks, builtAt: currentItem.builtAt || Date.now(), builtItems: [...builtItems, newItemInstance], };
         setGrid(newGrid);
-        setDiscipline(d => d - item.cost);
+        setDiscipline(discipline - item.cost);
         setPendingBuildItem(null);
         setSelectedSlot(null);
         showMessage(`${item.name} placed! Total SF: ${newTotalSF.toLocaleString()}`, "Construction Complete");
