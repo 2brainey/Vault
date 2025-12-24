@@ -1,10 +1,76 @@
 import React, { useState } from 'react';
 import { 
   X, Check, Lock, ChevronRight, Star, 
-  Trophy, AlertTriangle, Package, DollarSign 
+  Trophy, AlertTriangle, Package, DollarSign,
+  Zap, Droplet, Brain, Wrench
 } from 'lucide-react';
 import { RenderIcon, getRarityColor, getRarityGradient } from './dashboardutils';
 import { CARD_DATABASE, SKILL_DETAILS } from '../../data/gamedata';
+
+// --- NEW COMPONENTS: RESOURCES & VITALS ---
+
+export const ResourceCard = ({ cash, discipline, salvage }) => (
+    <div className="bg-[#1e1e1e] p-4 rounded-xl border border-slate-700 shadow-lg mb-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between border-b border-slate-700 pb-2">
+            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Liquid Assets</span>
+            <span className="text-emerald-400 font-mono font-bold text-lg flex items-center gap-1">
+                <span className="text-xs text-emerald-600">$</span> {cash.toLocaleString()}
+            </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+            <div className="bg-black/30 p-2 rounded border border-slate-800 flex flex-col items-center justify-center relative overflow-hidden group">
+                <div className="absolute inset-0 bg-pink-900/10 group-hover:bg-pink-900/20 transition-colors"></div>
+                <Brain size={16} className="text-pink-400 mb-1 z-10"/>
+                <span className="text-white font-mono font-bold text-sm z-10">{discipline.toLocaleString()}</span>
+                <span className="text-[8px] text-pink-400 uppercase font-bold z-10">Brain Matter</span>
+            </div>
+            <div className="bg-black/30 p-2 rounded border border-slate-800 flex flex-col items-center justify-center relative overflow-hidden group">
+                 <div className="absolute inset-0 bg-slate-700/10 group-hover:bg-slate-700/20 transition-colors"></div>
+                <Wrench size={16} className="text-slate-400 mb-1 z-10"/>
+                <span className="text-white font-mono font-bold text-sm z-10">{salvage}</span>
+                <span className="text-[8px] text-slate-500 uppercase font-bold z-10">Salvage</span>
+            </div>
+        </div>
+    </div>
+);
+
+export const VitalsHUD = ({ wellness, onMaintain }) => {
+    const getColor = (val, type) => {
+        if (val < 30) return 'bg-red-500';
+        if (type === 'energy') return 'bg-yellow-400';
+        if (type === 'hydration') return 'bg-blue-400';
+        return 'bg-purple-400';
+    };
+
+    return (
+        <div className="bg-[#1e1e1e] p-3 rounded-xl border border-slate-700 shadow-lg mb-4">
+            <div className="flex justify-between items-center mb-2">
+                <span className="text-[10px] uppercase font-bold text-slate-500">Biological Status</span>
+                <span className="text-[9px] text-slate-600 font-mono">V.33.1</span>
+            </div>
+            <div className="space-y-3">
+                {[
+                    { label: 'Energy', key: 'energy', icon: 'Zap', color: 'text-yellow-400' },
+                    { label: 'Hydration', key: 'hydration', icon: 'Droplet', color: 'text-blue-400' },
+                    { label: 'Focus', key: 'focus', icon: 'Brain', color: 'text-purple-400' }
+                ].map(vital => (
+                    <div key={vital.key} className="group cursor-pointer" onClick={() => onMaintain && onMaintain(vital.key)}>
+                        <div className="flex justify-between text-[10px] mb-1 font-bold text-slate-300">
+                            <span className="flex items-center gap-1"><RenderIcon name={vital.icon} size={10} className={vital.color}/> {vital.label}</span>
+                            <span className="group-hover:text-emerald-400 transition-colors">{Math.floor(wellness[vital.key])}%</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-black rounded-full overflow-hidden border border-slate-800 relative">
+                             <div 
+                                className={`h-full ${getColor(wellness[vital.key], vital.key)} transition-all duration-500`} 
+                                style={{ width: `${wellness[vital.key]}%` }}
+                             ></div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
 
 // --- GENERIC INPUT COMPONENTS ---
 
@@ -33,7 +99,7 @@ export const InputField = ({ label, value, onChange, type = "text" }) => (
 
 export const InventoryGrid = ({ slots, containerId, mp, cash, salvage, onUseItem, onDragStart, onDrop, onContextMenu }) => {
     return (
-        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 gap-2">
+        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2 relative z-0">
             {slots.map((item, index) => {
                 const isEmpty = !item;
                 const rarityColor = !isEmpty ? getRarityColor(item.rarity) : '';
@@ -63,8 +129,8 @@ export const InventoryGrid = ({ slots, containerId, mp, cash, salvage, onUseItem
                                         x{item.count}
                                     </div>
                                 )}
-                                {/* Tooltip */}
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[150px] bg-black/90 text-white text-[10px] p-2 rounded border border-slate-700 hidden group-hover:block z-50 pointer-events-none">
+                                {/* Tooltip - FIXED Z-INDEX to ensure it floats above headers */}
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[150px] bg-black/95 text-white text-[10px] p-2 rounded border border-slate-600 hidden group-hover:block z-[100] pointer-events-none shadow-2xl">
                                     <div className="font-bold text-amber-400">{item.name}</div>
                                     <div className="text-[9px] text-slate-400">{item.type} • {item.rarity}</div>
                                     <div className="text-[9px] italic mt-1 text-slate-300 leading-tight">{item.desc || item.effect}</div>
@@ -92,17 +158,17 @@ export const CollectionBinder = ({ cards, onSell, onSellAll }) => {
 
     return (
         <div className="flex flex-col h-full">
-            <div className="flex justify-between items-center mb-4 px-2">
+            <div className="flex justify-between items-center mb-4 px-2 bg-[#1a1a1a] p-2 rounded border border-slate-800 sticky top-0 z-10">
                 <div>
-                    <h3 className="text-lg font-bold text-white">Card Collection</h3>
-                    <p className="text-xs text-slate-400">{cards.length} Cards Collected</p>
+                    <h3 className="text-sm font-bold text-white">Card Collection</h3>
+                    <p className="text-[10px] text-slate-400">{cards.length} Cards Collected</p>
                 </div>
                 {totalValue > 0 && (
                     <button 
                         onClick={() => onSellAll && onSellAll({ value: totalValue })}
-                        className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-black text-xs font-bold rounded flex items-center gap-2"
+                        className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-black text-[10px] font-bold rounded flex items-center gap-2"
                     >
-                        <DollarSign size={12}/> Sell Duplicates (+{totalValue})
+                        <DollarSign size={10}/> Sell Duplicates (+{totalValue})
                     </button>
                 )}
             </div>
@@ -178,8 +244,9 @@ export const ContractWidget = ({ contracts, onToggle }) => {
     );
 };
 
-// --- UPDATED MASTERY MODAL (No Hardcoded Rewards) ---
-export const MasteryModal = ({ skill, onClose, onClaimReward, claimedLevels = [], customRewards = {} }) => {
+// --- MASTERY MODAL ---
+
+export const MasteryModal = ({ skill, onClose, onClaimReward, claimedLevels = [] }) => {
     if (!skill) return null;
 
     const levels = Array.from({ length: 99 }, (_, i) => i + 1);
@@ -211,32 +278,19 @@ export const MasteryModal = ({ skill, onClose, onClaimReward, claimedLevels = []
                         {levels.map(lvl => {
                             const isUnlocked = skill.level >= lvl;
                             const isClaimed = claimedLevels.includes(lvl);
-                            
-                            // --- CHANGED HERE: LOOKUP ONLY CUSTOM REWARDS ---
-                            const reward = customRewards?.[skill.id]?.[lvl];
-                            // ------------------------------------------------
-
-                            // Hide levels that are locked AND have no reward (to save space), 
-                            // but show unlocked empty levels so player sees progress.
-                            if (!reward && !isUnlocked) return null;
+                            const isMilestone = lvl % 10 === 0;
+                            const reward = isMilestone ? { name: `${skill.name} Crate`, type: 'Item' } : null;
 
                             return (
-                                <div key={lvl} className={`flex items-center gap-4 p-3 rounded-lg border ${isUnlocked ? 'bg-slate-900/50 border-slate-700' : 'bg-black/40 border-slate-800 opacity-50'} ${reward ? 'border-purple-500/30' : ''}`}>
+                                <div key={lvl} className={`flex items-center gap-4 p-3 rounded-lg border ${isUnlocked ? 'bg-slate-900/50 border-slate-700' : 'bg-black/40 border-slate-800 opacity-50'} ${isMilestone ? 'border-amber-500/30' : ''}`}>
                                     <div className={`w-8 h-8 flex items-center justify-center rounded font-bold text-xs ${isUnlocked ? 'bg-slate-700 text-white' : 'bg-slate-800 text-slate-600'}`}>
                                         {lvl}
                                     </div>
                                     <div className="flex-1">
                                         <div className="text-sm font-bold text-slate-300">
-                                            {reward ? <span className="text-purple-400">Mastery Reward</span> : `Level ${lvl}`}
+                                            {isMilestone ? 'Milestone Unlocked' : `Level ${lvl}`}
                                         </div>
-                                        {reward && (
-                                            <div className="text-xs text-slate-400 flex items-center gap-2">
-                                                <span>{reward.name}</span>
-                                                {reward.amount && reward.type === 'Currency' && <span className="text-emerald-400">${reward.amount}</span>}
-                                                {reward.amount && reward.type === 'XP' && <span className="text-purple-400">+{reward.amount} XP</span>}
-                                                {reward.count && reward.count > 1 && <span className="text-emerald-400">x{reward.count}</span>}
-                                            </div>
-                                        )}
+                                        {reward && <div className="text-xs text-amber-500">Reward: {reward.name}</div>}
                                     </div>
                                     
                                     {reward && (
