@@ -7,25 +7,27 @@ import {
     SHOP_ITEMS, 
     CARD_DATABASE,
     SKILL_DETAILS,
-    MAX_SKILL_LEVEL,
-    DEFAULT_ESTATE_ITEMS
-} from '../data/gamedata';
+    MAX_SKILL_LEVEL 
+} from '../data/gamedata'; 
 
 // --- HELPER FUNCTIONS ---
 
 const addToSlotArray = (slots, item, quantity = 1) => {
     const newSlots = [...slots];
+    // Stack existing
     const existingIndex = newSlots.findIndex(s => s && s.name === item.name && s.rarity === item.rarity);
     if (existingIndex !== -1) {
         newSlots[existingIndex] = { ...newSlots[existingIndex], count: newSlots[existingIndex].count + quantity };
         return newSlots;
     }
+    // Find empty
     const emptyIndex = newSlots.findIndex(s => s === null);
     if (emptyIndex !== -1) {
+        // Ensure unique ID for drag keys
         newSlots[emptyIndex] = { ...item, count: quantity, id: Date.now() + Math.random() };
         return newSlots;
     }
-    return null;
+    return null; // Inventory full
 };
 
 // Helper to safely merge saved data
@@ -34,20 +36,15 @@ const mergeData = (base, saved) => {
       ...base, 
       ...saved,
       salvage: saved?.salvage !== undefined ? saved.salvage : (base.salvage || 0),
-      lastDailyClaim: saved?.lastDailyClaim || 0, // Merge new persistence fields
+      lastDailyClaim: saved?.lastDailyClaim || 0, 
       lastHourlyClaim: saved?.lastHourlyClaim || 0,
+      customRewards: saved?.customRewards || {}, // NEW: Merge custom rewards
       statistics: { ...base.statistics, ...(saved?.statistics || {}) },
       bonusXP: { ...base.bonusXP, ...(saved?.bonusXP || {}) },
       wellness: { ...base.wellness, ...(saved?.wellness || {}) },
       assets: { ...base.assets, ...(saved?.assets || {}) },
       liabilities: { ...base.liabilities, ...(saved?.liabilities || {}) },
-      lifetime: { ...base.lifetime, ...(saved?.lifetime || {}) },
-      // Merge estate data, ensuring shopItems are preserved if present in save
-      estate: { 
-          ...base.estate, 
-          ...(saved?.estate || {}),
-          shopItems: saved?.estate?.shopItems || base.estate.shopItems 
-      }
+      lifetime: { ...base.lifetime, ...(saved?.lifetime || {}) }
   };
   
   if (!saved?.layout?.home?.left_sidebar) {
@@ -72,19 +69,15 @@ const mergeData = (base, saved) => {
 
 // --- XP CALCULATION HELPERS ---
 const calcLevel = (xp) => Math.max(1, Math.min(Math.floor(25 * Math.log10((xp / 100) + 1)), 99));
+// Reverse calc to set level: XP = 100 * (10^(Level/25) - 1)
+const calcXpForLevel = (level) => Math.ceil(100 * (Math.pow(10, level / 25) - 1));
+
 const getXP = (base, id, data) => (Number(base) || 0) + (data.bonusXP?.[id] || 0);
 
 // --- ZUSTAND STORE ---
 
 export const useGameStore = create((set, get) => ({
-  data: {
-      ...initialData,
-      estate: {
-          grid: [ { type: 'empty', links: [] } ], 
-          gridDimension: 1,
-          shopItems: DEFAULT_ESTATE_ITEMS 
-      }
-  },
+  data: { ...initialData, customRewards: {} },
   userId: 'test-user-id', 
   loading: true,
   isSaving: false,
@@ -96,42 +89,13 @@ export const useGameStore = create((set, get) => ({
       const localData = localStorage.getItem('vault_save_v1');
       if (localData) {
           const parsed = JSON.parse(localData);
-          // Re-merge with current initialData to ensure new fields (like estate) are present
-          const baseData = {
-              ...initialData,
-              estate: {
-                  grid: [ { type: 'empty', links: [] } ],
-                  gridDimension: 1,
-                  shopItems: DEFAULT_ESTATE_ITEMS
-              }
-          };
-          set({ data: mergeData(baseData, parsed), loading: false });
+          set({ data: mergeData(initialData, parsed), loading: false });
       } else {
-          set({ 
-              data: {
-                  ...initialData,
-                  estate: {
-                      grid: [ { type: 'empty', links: [] } ],
-                      gridDimension: 1,
-                      shopItems: DEFAULT_ESTATE_ITEMS
-                  }
-              }, 
-              loading: false 
-          });
+          set({ data: initialData, loading: false });
       }
     } catch (error) {
       console.error("Load Error:", error);
-      set({ 
-          data: {
-              ...initialData,
-              estate: {
-                  grid: [ { type: 'empty', links: [] } ],
-                  gridDimension: 1,
-                  shopItems: DEFAULT_ESTATE_ITEMS
-              }
-          }, 
-          loading: false 
-      });
+      set({ data: initialData, loading: false });
     }
   },
 
@@ -152,14 +116,13 @@ export const useGameStore = create((set, get) => ({
     return { data: { ...state.data, discipline: newVal } };
   }),
 
-  // --- NEW SHOP ACTIONS ---
+  // --- GAMEPLAY ACTIONS ---
   claimDailyAction: () => {
     const state = get();
     const now = Date.now();
     if (now - state.data.lastDailyClaim < 86400000) return { success: false, message: "Already claimed today!" };
 
     set(prev => {
-        // Reward: 5000 Discipline + 5 Salvage
         const newSalvage = (prev.data.salvage || 0) + 5;
         return {
             data: {
@@ -178,8 +141,7 @@ export const useGameStore = create((set, get) => ({
     const now = Date.now();
     if (now - state.data.lastHourlyClaim < 3600000) return { success: false, message: "Hourly crate not ready." };
 
-    // Reward: Random basic item
-    const possibleRewards = [...SHOP_ITEMS.boosters]; // Simple pool for example
+    const possibleRewards = [...SHOP_ITEMS.boosters]; 
     const reward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)];
     
     set(prev => {
@@ -291,9 +253,8 @@ export const useGameStore = create((set, get) => ({
       const keys = path.split('.');
       let current = newData;
       for (let i = 0; i < keys.length - 1; i++) {
-          const key = keys[i];
-          current[key] = { ...current[key] };
-          current = current[key];
+          if(!current[keys[i]]) current[keys[i]] = {}; // Safety check
+          current = current[keys[i]];
       }
       current[keys[keys.length - 1]] = value;
       return { data: newData };
@@ -377,6 +338,30 @@ export const useGameStore = create((set, get) => ({
   },
 
   handleClaimMasteryRewardAction: (skillId, level, reward) => {
+    set(prev => {
+        const currentClaims = prev.data.lifetime.claimedMasteryRewards[skillId] || [];
+        if (currentClaims.includes(level)) return prev;
+
+        const newClaims = { 
+            ...prev.data.lifetime.claimedMasteryRewards, 
+            [skillId]: [...currentClaims, level] 
+        };
+        
+        let newData = { ...prev.data, lifetime: { ...prev.data.lifetime, claimedMasteryRewards: newClaims } };
+        
+        // Grant Reward
+        if (reward.type === 'Item') {
+            const newInv = addToSlotArray(newData.inventory, reward, reward.count || 1);
+            if (newInv) newData.inventory = newInv;
+        } else if (reward.type === 'Currency') {
+            if (reward.currency === 'cash') newData.cash = (newData.cash || 0) + reward.amount;
+            if (reward.currency === 'discipline') newData.discipline = (newData.discipline || 0) + reward.amount;
+        } else if (reward.type === 'XP') {
+             newData.bonusXP[skillId] = (newData.bonusXP[skillId] || 0) + reward.amount;
+        }
+
+        return { data: newData };
+    });
     return { success: true, message: `Claimed ${reward.name}!` };
   },
 
@@ -384,39 +369,21 @@ export const useGameStore = create((set, get) => ({
     const state = get();
     const data = state.data;
     
-    // --- UPDATED XP CALCULATIONS FOR OCTAGON MODEL (8 SKILLS) ---
-    // Engineering (eng): Coding + AI Ops + Tech Assets
     const engXP = getXP(35000 + ((data.assets?.digitalIP || 0) * 10), 'eng', data);
-    
-    // Influence (inf): Content + Network + Audience
     const infXP = getXP(15000 + ((data.assets?.audience || 0) * 50), 'inf', data);
-    
-    // Liquidity (liq): Income + Cash Flow + Cash
     const currentCashFlowValue = (data.monthlyIncome || 0) - (data.monthlyExpenses || 0);
     const liqXP = getXP((data.lifetime.totalIncomeBase * 2) + (currentCashFlowValue * 50) + (data.assets?.cash || 0), 'liq', data);
-    
-    // Equity (equ): Assets + Investments + Real Estate + Debt Repayment
     const equXP = getXP(data.lifetime.totalAssetAcquisitionCost + (data.lifetime.totalDebtPrincipalPaid * 2) + (data.assets?.realEstate || 0) + (data.assets?.stocks || 0) + (data.assets?.crypto || 0), 'equ', data);
-    
-    // Vitality (vit): Health metrics (placeholder static base + future gym/sleep data)
     const vitXP = getXP(85000 + ((data.statistics?.maintenance?.energy || 0) * 100), 'vit', data);
-    
-    // Intellect (int): Wisdom + Learning (achievements)
     const intXP = getXP(30000 + (data.achievements.filter(a => a.completed).length * 5000), 'int', data);
-    
-    // Security (sec): Emergency fund (cash / expenses ratio) + defensive assets
     const safetyMonths = data.monthlyExpenses > 0 ? (data.cash / data.monthlyExpenses) : 0;
     const secXP = getXP((safetyMonths * 5000) + (data.assets?.metals || 0), 'sec', data);
-    
-    // Willpower (wil): Discipline + Streaks + Hard Tasks
     const wilXP = getXP((data.discipline * 2) + (data.streak * 1000), 'wil', data);
 
     const skillXpMap = {
         eng: engXP, inf: infXP, liq: liqXP, equ: equXP, 
         vit: vitXP, int: intXP, sec: secXP, wil: wilXP
     };
-
-    const totalXPs = skillXpMap;
     
     const calculatedSkills = Object.keys(SKILL_DETAILS).map(key => {
         let xp = skillXpMap[key] || 0;
@@ -429,6 +396,60 @@ export const useGameStore = create((set, get) => ({
         };
     });
 
-    return { calculatedSkills, totalXPs };
+    return { calculatedSkills, totalXPs: skillXpMap };
   },
+
+  // --- DEVELOPER MODE ACTIONS ---
+  
+  dev_addItem: (item, qty = 1) => {
+      set(prev => {
+          const newInv = addToSlotArray([...prev.data.inventory], item, qty);
+          return newInv ? { data: { ...prev.data, inventory: newInv } } : prev;
+      });
+  },
+
+  dev_removeItem: (index) => {
+      set(prev => {
+          const newInv = [...prev.data.inventory];
+          newInv[index] = null;
+          return { data: { ...prev.data, inventory: newInv } };
+      });
+  },
+
+  dev_setSkillLevel: (skillId, targetLevel) => {
+      const state = get();
+      const targetXP = calcXpForLevel(targetLevel);
+      const currentTotal = state.getSkillData().totalXPs[skillId];
+      const currentBonus = state.data.bonusXP[skillId] || 0;
+      const currentBase = currentTotal - currentBonus;
+      const newBonus = Math.max(0, targetXP - currentBase);
+
+      set(prev => ({
+          data: {
+              ...prev.data,
+              bonusXP: { ...prev.data.bonusXP, [skillId]: newBonus }
+          }
+      }));
+  },
+
+  dev_setMasteryReward: (skillId, level, reward) => {
+      set(prev => {
+          const skillRewards = prev.data.customRewards?.[skillId] || {};
+          if (!reward) {
+              const newSkillRewards = { ...skillRewards };
+              delete newSkillRewards[level];
+              return { data: { ...prev.data, customRewards: { ...prev.data.customRewards, [skillId]: newSkillRewards } } };
+          }
+          return { 
+              data: { 
+                  ...prev.data, 
+                  customRewards: { 
+                      ...prev.data.customRewards, 
+                      [skillId]: { ...skillRewards, [level]: reward } 
+                  } 
+              } 
+          };
+      });
+  }
+
 }));

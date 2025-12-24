@@ -178,9 +178,8 @@ export const ContractWidget = ({ contracts, onToggle }) => {
     );
 };
 
-// --- MASTERY MODAL ---
-
-export const MasteryModal = ({ skill, onClose, onClaimReward, claimedLevels = [] }) => {
+// --- UPDATED MASTERY MODAL (No Hardcoded Rewards) ---
+export const MasteryModal = ({ skill, onClose, onClaimReward, claimedLevels = [], customRewards = {} }) => {
     if (!skill) return null;
 
     const levels = Array.from({ length: 99 }, (_, i) => i + 1);
@@ -212,19 +211,32 @@ export const MasteryModal = ({ skill, onClose, onClaimReward, claimedLevels = []
                         {levels.map(lvl => {
                             const isUnlocked = skill.level >= lvl;
                             const isClaimed = claimedLevels.includes(lvl);
-                            const isMilestone = lvl % 10 === 0;
-                            const reward = isMilestone ? { name: `${skill.name} Crate`, type: 'Item' } : null;
+                            
+                            // --- CHANGED HERE: LOOKUP ONLY CUSTOM REWARDS ---
+                            const reward = customRewards?.[skill.id]?.[lvl];
+                            // ------------------------------------------------
+
+                            // Hide levels that are locked AND have no reward (to save space), 
+                            // but show unlocked empty levels so player sees progress.
+                            if (!reward && !isUnlocked) return null;
 
                             return (
-                                <div key={lvl} className={`flex items-center gap-4 p-3 rounded-lg border ${isUnlocked ? 'bg-slate-900/50 border-slate-700' : 'bg-black/40 border-slate-800 opacity-50'} ${isMilestone ? 'border-amber-500/30' : ''}`}>
+                                <div key={lvl} className={`flex items-center gap-4 p-3 rounded-lg border ${isUnlocked ? 'bg-slate-900/50 border-slate-700' : 'bg-black/40 border-slate-800 opacity-50'} ${reward ? 'border-purple-500/30' : ''}`}>
                                     <div className={`w-8 h-8 flex items-center justify-center rounded font-bold text-xs ${isUnlocked ? 'bg-slate-700 text-white' : 'bg-slate-800 text-slate-600'}`}>
                                         {lvl}
                                     </div>
                                     <div className="flex-1">
                                         <div className="text-sm font-bold text-slate-300">
-                                            {isMilestone ? 'Milestone Unlocked' : `Level ${lvl}`}
+                                            {reward ? <span className="text-purple-400">Mastery Reward</span> : `Level ${lvl}`}
                                         </div>
-                                        {reward && <div className="text-xs text-amber-500">Reward: {reward.name}</div>}
+                                        {reward && (
+                                            <div className="text-xs text-slate-400 flex items-center gap-2">
+                                                <span>{reward.name}</span>
+                                                {reward.amount && reward.type === 'Currency' && <span className="text-emerald-400">${reward.amount}</span>}
+                                                {reward.amount && reward.type === 'XP' && <span className="text-purple-400">+{reward.amount} XP</span>}
+                                                {reward.count && reward.count > 1 && <span className="text-emerald-400">x{reward.count}</span>}
+                                            </div>
+                                        )}
                                     </div>
                                     
                                     {reward && (
