@@ -1,0 +1,10 @@
+{
+	"folders": [
+		{
+			"path": "../../GroundZero"
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "GroundZero"
+	}
+}

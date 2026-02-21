@@ -1,0 +1,17 @@
+import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth"; // Added import
+
+// Access key via Vite's global environment object
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: "vault-b78d7.firebaseapp.com",
+  projectId: "vault-b78d7",
+  storageBucket: "vault-b78d7.firebasestorage.app",
+  messagingSenderId: "146171266218",
+  appId: "1:146171266218:web:3c73e1759ec1358a683cd3"
+};
+
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
+export const auth = getAuth(app); // Export auth for use in components
